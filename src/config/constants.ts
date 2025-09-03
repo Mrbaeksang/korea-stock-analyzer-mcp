@@ -1,0 +1,44 @@
+/**
+ * 전역 상수 정의
+ */
+
+// 밸류에이션 상수
+export const VALUATION_CONSTANTS = {
+  DEFAULT_PER: 15,
+  DEFAULT_PBR: 1.5,
+  DEFAULT_GROWTH_RATE: 10,
+  RISK_FREE_RATE: 0.03,
+  DEFAULT_WACC: 0.10,
+  TERMINAL_GROWTH_RATE: 0.03,
+};
+
+// 투자 등급 기준
+export const RATING_THRESHOLDS = {
+  STRONG_BUY: 30,
+  BUY: 15,
+  HOLD: -10,
+  SELL: -20,
+};
+
+// 기술적 지표 기준
+export const TECHNICAL_THRESHOLDS = {
+  RSI_OVERBOUGHT: 70,
+  RSI_OVERSOLD: 30,
+  HIGH_VOLATILITY: 40,
+  LOW_VOLATILITY: 20,
+};
+
+// 재무 건전성 기준
+export const FINANCIAL_HEALTH = {
+  GOOD_ROE: 15,
+  GOOD_DEBT_RATIO: 0.5,
+  GOOD_CURRENT_RATIO: 1.5,
+  GOOD_DIVIDEND_YIELD: 3,
+};
+
+// 시간 관련 상수
+export const TIME_PERIODS = {
+  DAYS_IN_YEAR: 252, // 거래일 기준
+  YEARS_FOR_ANALYSIS: 5,
+  MONTHS_FOR_MOMENTUM: 12,
+};

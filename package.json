@@ -1,0 +1,46 @@
+{
+  "name": "@mrbaeksang/korea-stock-analyzer-mcp",
+  "version": "1.0.0",
+  "description": "Korean stock analyzer with 6 investment legends' strategies for Claude Desktop (MCP)",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "korea-stock-analyzer": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "tsx src/index.ts"
+  },
+  "keywords": [
+    "mcp",
+    "korean-stock",
+    "investment",
+    "claude-desktop",
+    "kospi",
+    "kosdaq",
+    "pykrx",
+    "stock-analysis",
+    "buffett",
+    "value-investing"
+  ],
+  "author": "Mrbaeksang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mrbaeksang/korea-stock-analyzer-mcp.git"
+  },
+  "homepage": "https://github.com/Mrbaeksang/korea-stock-analyzer-mcp",
+  "bugs": {
+    "url": "https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
