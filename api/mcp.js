@@ -186,25 +186,83 @@ export default async function handler(req, res) {
     });
   }
 
-  // POST 요청: MCP 명령 실행 (간단한 시뮬레이션)
+  // POST 요청: MCP 명령 실행 (JSON-RPC 2.0)
   if (req.method === 'POST') {
-    const { method, params } = req.body;
+    const { jsonrpc, method, params, id } = req.body;
     
     try {
-      // 실제 구현시에는 여기에 MCP 서버 실행 로직 추가
-      // 현재는 데모 응답 반환
-      
-      // 예시: analyze_equity 요청 처리
-      if (method === 'analyze_equity') {
+      // MCP 표준 메서드 처리
+      if (method === 'initialize') {
         return res.status(200).json({
-          content: [
-            {
-              type: 'text',
-              text: `# 📊 ${params.company_name || params.ticker} 실시간 분석
+          jsonrpc: '2.0',
+          id: id || 1,
+          result: {
+            protocolVersion: '1.0',
+            serverInfo: {
+              name: 'Korean Stock Analyzer MCP',
+              version: '1.1.1'
+            },
+            capabilities: {
+              tools: {}
+            }
+          }
+        });
+      }
+      
+      // tools/list 메서드
+      if (method === 'tools/list') {
+        return res.status(200).json({
+          jsonrpc: '2.0',
+          id: id || 1,
+          result: {
+            tools: [
+              {
+                name: 'analyze_equity',
+                description: '한국 주식 종목 종합 분석',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    ticker: { type: 'string' },
+                    company_name: { type: 'string' },
+                    report_type: { type: 'string', enum: ['quick', 'summary', 'full'] }
+                  },
+                  required: ['ticker', 'company_name']
+                }
+              },
+              {
+                name: 'get_financial_data',
+                description: '재무제표 데이터 조회',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    ticker: { type: 'string' },
+                    years: { type: 'number' }
+                  },
+                  required: ['ticker']
+                }
+              }
+            ]
+          }
+        });
+      }
+      
+      // tools/call 메서드  
+      if (method === 'tools/call') {
+        const { name: toolName, arguments: toolArgs } = params;
+        
+        if (toolName === 'analyze_equity') {
+          return res.status(200).json({
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: `# 📊 ${toolArgs.company_name || toolArgs.ticker} 실시간 분석
               
 ## 주요 지표
-- 종목코드: ${params.ticker}
-- 분석 유형: ${params.report_type || 'quick'}
+- 종목코드: ${toolArgs.ticker}
+- 분석 유형: ${toolArgs.report_type || 'quick'}
 
 ✅ 실제 서비스에서는 pykrx API를 통해 실시간 데이터를 제공합니다.
 - 현재가, 거래량, 시가총액
@@ -215,25 +273,47 @@ export default async function handler(req, res) {
 
 자세한 사용법은 GitHub 참조:
 https://github.com/Mrbaeksang/korea-stock-analyzer-mcp`
+                }
+              ]
             }
-          ]
+          });
+        }
+        
+        // 다른 도구도 JSON-RPC 형식으로
+        return res.status(200).json({
+          jsonrpc: '2.0',
+          id: id || 1,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: `Tool: ${toolName}\nArgs: ${JSON.stringify(toolArgs, null, 2)}\n\n실제 데이터는 로컬 MCP 서버에서 제공됩니다.`
+              }
+            ]
+          }
         });
       }
       
-      // 다른 도구들도 비슷하게 처리
+      // 알 수 없는 메서드
       return res.status(200).json({
-        content: [
-          {
-            type: 'text',
-            text: `Method: ${method}\nParams: ${JSON.stringify(params, null, 2)}\n\n실제 데이터는 MCP 서버 설치 후 사용 가능합니다.`
-          }
-        ]
+        jsonrpc: '2.0',
+        id: id || 1,
+        error: {
+          code: -32601,
+          message: 'Method not found',
+          data: { method }
+        }
       });
       
     } catch (error) {
-      return res.status(500).json({
-        error: 'Execution failed',
-        message: error.message
+      return res.status(200).json({
+        jsonrpc: '2.0',
+        id: id || 1,
+        error: {
+          code: -32603,
+          message: 'Internal error',
+          data: error.message
+        }
       });
     }
   }
