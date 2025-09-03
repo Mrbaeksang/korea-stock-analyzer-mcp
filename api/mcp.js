@@ -85,7 +85,15 @@ export default async function handler(req, res) {
         description: '한국 주식 시장 전문 분석 도구',
         author: 'Mrbaeksang',
         capabilities: {
-          tools: {}
+          tools: {
+            "analyze_equity": {},
+            "get_financial_data": {},
+            "get_technical_indicators": {},
+            "calculate_dcf": {},
+            "search_news": {},
+            "get_supply_demand": {},
+            "compare_peers": {}
+          }
         },
         tools: [
         {
@@ -203,7 +211,15 @@ export default async function handler(req, res) {
               version: '1.1.1'
             },
             capabilities: {
-              tools: {}
+              tools: {
+                "analyze_equity": {},
+                "get_financial_data": {},
+                "get_technical_indicators": {},
+                "calculate_dcf": {},
+                "search_news": {},
+                "get_supply_demand": {},
+                "compare_peers": {}
+              }
             }
           }
         });
