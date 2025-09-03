@@ -31,7 +31,7 @@ class KoreanStockAnalysisMCP {
     this.server = new Server(
       {
         name: 'korean-stock-analysis',
-        version: '1.1.0',
+        version: '1.1.1',
       },
       {
         capabilities: {
@@ -402,33 +402,51 @@ class KoreanStockAnalysisMCP {
       const marketData = await MarketDataService.fetchBasic(ticker);
       
       const current = Array.isArray(financialData) ? financialData[0] : financialData;
-      const fcf = current.eps * 1.2; // 간단한 FCF 추정
       
-      // 5년 DCF 계산
-      let dcfValue = 0;
+      // FCF 추정 개선: EPS * (1 - 재투자율)
+      // 보수적으로 EPS의 70%를 FCF로 가정 (30% 재투자)
+      const fcfPerShare = current.eps * 0.7;
+      
+      // 5년 예측 기간 DCF 계산
+      let pvOfFCF = 0;
       for (let year = 1; year <= 5; year++) {
-        const futureValue = fcf * Math.pow(1 + growth_rate/100, year);
+        const futureValue = fcfPerShare * Math.pow(1 + growth_rate/100, year);
         const presentValue = futureValue / Math.pow(1 + discount_rate/100, year);
-        dcfValue += presentValue;
+        pvOfFCF += presentValue;
       }
       
-      // 터미널 가치
-      const terminalGrowth = 3; // 영구성장률 3%
-      const terminalValue = (fcf * Math.pow(1 + growth_rate/100, 5) * (1 + terminalGrowth/100)) / 
-                           (discount_rate/100 - terminalGrowth/100);
+      // 터미널 가치 (Gordon Growth Model)
+      const terminalGrowth = 3; // 영구성장률 3% (GDP 성장률 수준)
+      
+      // 터미널 가치 계산 수정: 6년차 FCF / (할인율 - 성장률)
+      const year6FCF = fcfPerShare * Math.pow(1 + growth_rate/100, 5) * (1 + terminalGrowth/100);
+      const terminalValue = year6FCF / (discount_rate/100 - terminalGrowth/100);
       const terminalPV = terminalValue / Math.pow(1 + discount_rate/100, 5);
       
-      dcfValue += terminalPV;
+      // 주당 내재가치 = 5년 FCF 현재가치 + 터미널 가치 현재가치
+      const intrinsicValuePerShare = pvOfFCF + terminalPV;
+      
+      // 민감도 분석을 위한 추가 계산
+      const terminalValueRatio = (terminalPV / intrinsicValuePerShare * 100).toFixed(1);
       
       const result = {
         currentPrice: marketData.currentPrice,
-        dcfValue: Math.round(dcfValue),
-        upside: ((dcfValue - marketData.currentPrice) / marketData.currentPrice * 100).toFixed(1),
-        assumptions: {
-          growthRate: growth_rate,
-          discountRate: discount_rate,
-          terminalGrowth: terminalGrowth,
+        intrinsicValue: Math.round(intrinsicValuePerShare),
+        upside: ((intrinsicValuePerShare - marketData.currentPrice) / marketData.currentPrice * 100).toFixed(1),
+        details: {
+          fcfPerShare: Math.round(fcfPerShare),
+          pvOfFCF: Math.round(pvOfFCF),
+          terminalValue: Math.round(terminalPV),
+          terminalValueRatio: `${terminalValueRatio}%`,
         },
+        assumptions: {
+          growthRate: `${growth_rate}%`,
+          discountRate: `${discount_rate}%`,
+          terminalGrowth: `${terminalGrowth}%`,
+          fcfMargin: '70% of EPS',
+        },
+        recommendation: intrinsicValuePerShare > marketData.currentPrice * 1.2 ? '매수' : 
+                       intrinsicValuePerShare > marketData.currentPrice * 0.9 ? '보유' : '매도',
       };
       
       return {
