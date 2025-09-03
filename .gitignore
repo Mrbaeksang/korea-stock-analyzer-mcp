@@ -11,6 +11,8 @@ build/
 *.js.map
 *.d.ts
 !tsconfig.json
+!api/**/*.js
+!vercel.json
 
 # Environment variables
 .env
