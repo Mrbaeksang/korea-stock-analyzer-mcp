@@ -19,14 +19,33 @@ A Model Context Protocol (MCP) server that provides comprehensive Korean stock m
 
 ### Quick Start
 
-Add to Claude Desktop config:
+Choose your preferred installation method:
 
+#### Option 1: NPX (Simplest)
+```bash
+npx @mrbaeksang/korea-stock-analyzer-mcp
+```
+
+#### Option 2: Claude Desktop
+Add to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "korea-stock-analyzer": {
       "command": "npx",
-      "args": ["@mrbaeksang/korea-stock-analyzer-mcp"]
+      "args": ["-y", "@mrbaeksang/korea-stock-analyzer-mcp"]
+    }
+  }
+}
+```
+
+#### Option 3: Remote MCP (Serverless)
+```json
+{
+  "mcpServers": {
+    "korea-stock-analyzer": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://korea-stock-analyzer-mcp.vercel.app/api/mcp"]
     }
   }
 }
@@ -74,9 +93,26 @@ Add to Claude Desktop config:
 - 🚀 **설정 불필요** - 즉시 사용 가능
 - 🇰🇷 **한국 시장 특화** - 한국 주식 분석에 최적화
 
-### 빠른 시작
+### 설치 방법
 
-#### 방법 1: Claude Desktop에서 사용
+#### 🚀 방법 1: NPX 실행 (가장 간단)
+
+```bash
+# 즉시 실행 - 설치 불필요
+npx @mrbaeksang/korea-stock-analyzer-mcp
+```
+
+#### 📦 방법 2: NPM 글로벌 설치
+
+```bash
+# 글로벌 설치
+npm install -g @mrbaeksang/korea-stock-analyzer-mcp
+
+# 실행
+korea-stock-analyzer
+```
+
+#### 🤖 방법 3: Claude Desktop 설정
 
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`  
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -86,15 +122,44 @@ Add to Claude Desktop config:
   "mcpServers": {
     "korea-stock-analyzer": {
       "command": "npx",
-      "args": ["@mrbaeksang/korea-stock-analyzer-mcp"]
+      "args": ["-y", "@mrbaeksang/korea-stock-analyzer-mcp"]
     }
   }
 }
 ```
 
-#### 방법 2: 카카오 PlayMCP에서 사용 🆕
+#### 🛠️ 방법 4: Claude Code (자동 설정)
 
-카카오톡 AI 채팅에서 바로 사용 가능! [PlayMCP](https://playmcp.kakao.com)에서 "한국주식 AI 분석가"를 검색하세요.
+```bash
+claude mcp add korea-stock -- npx -y @mrbaeksang/korea-stock-analyzer-mcp
+```
+
+#### 🌐 방법 5: Remote MCP URL (서버리스)
+
+```json
+{
+  "mcpServers": {
+    "korea-stock-analyzer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://korea-stock-analyzer-mcp.vercel.app/api/mcp"
+      ]
+    }
+  }
+}
+```
+
+#### 💬 방법 6: 카카오 PlayMCP 🆕
+
+카카오톡 AI 채팅에서 바로 사용! [PlayMCP](https://playmcp.kakao.com)에서 "한국주식 AI 분석가"를 검색하세요.
+
+#### 🔧 방법 7: Smithery 자동 설치
+
+```bash
+npx -y @smithery/cli install korea-stock-analyzer --client claude
+```
 
 ### 사용 가능한 도구
 
@@ -125,15 +190,7 @@ Add to Claude Desktop config:
 - 🔍 **필립 피셔** - 15가지 성장성 체크리스트
 - 🌍 **존 템플턴** - 최대 비관 시점 투자
 
-### 설치 방법
-
-#### NPM 패키지 사용 (권장)
-
-```bash
-npx @mrbaeksang/korea-stock-analyzer-mcp
-```
-
-#### 소스코드에서 빌드
+### 소스코드에서 빌드
 
 ```bash
 # 저장소 복제
