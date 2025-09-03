@@ -76,7 +76,7 @@ Add to Claude Desktop config:
 
 ### 빠른 시작
 
-Claude Desktop 설정에 추가:
+#### 방법 1: Claude Desktop에서 사용
 
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`  
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -91,6 +91,10 @@ Claude Desktop 설정에 추가:
   }
 }
 ```
+
+#### 방법 2: 카카오 PlayMCP에서 사용 🆕
+
+카카오톡 AI 채팅에서 바로 사용 가능! [PlayMCP](https://playmcp.kakao.com)에서 "한국주식 AI 분석가"를 검색하세요.
 
 ### 사용 가능한 도구
 
