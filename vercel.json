@@ -1,9 +1,16 @@
 {
   "functions": {
     "api/mcp.js": {
-      "maxDuration": 10
+      "maxDuration": 10,
+      "memory": 512
     }
   },
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/mcp"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
