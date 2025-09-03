@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env node --max-old-space-size=4096
 /**
  * 한국 주식 전문 분석 MCP
  * @version 3.0

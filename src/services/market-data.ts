@@ -132,12 +132,12 @@ start_str = start_date.strftime('%Y%m%d')
 ohlcv = stock.get_market_ohlcv_by_date(start_str, end_str, ticker)
 
 if len(ohlcv) > 0:
-    # 이동평균
-    ma5 = ohlcv['종가'].rolling(window=5).mean().iloc[-1]
-    ma20 = ohlcv['종가'].rolling(window=20).mean().iloc[-1]
-    ma60 = ohlcv['종가'].rolling(window=60).mean().iloc[-1]
-    ma120 = ohlcv['종가'].rolling(window=120).mean().iloc[-1] if len(ohlcv) >= 120 else None
-    ma200 = ohlcv['종가'].rolling(window=200).mean().iloc[-1] if len(ohlcv) >= 200 else None
+    # 이동평균 (NaN 처리)
+    ma5 = ohlcv['종가'].rolling(window=5).mean().iloc[-1] if len(ohlcv) >= 5 else 0
+    ma20 = ohlcv['종가'].rolling(window=20).mean().iloc[-1] if len(ohlcv) >= 20 else 0
+    ma60 = ohlcv['종가'].rolling(window=60).mean().iloc[-1] if len(ohlcv) >= 60 else 0
+    ma120 = ohlcv['종가'].rolling(window=120).mean().iloc[-1] if len(ohlcv) >= 120 else 0
+    ma200 = ohlcv['종가'].rolling(window=200).mean().iloc[-1] if len(ohlcv) >= 200 else 0
     
     # RSI
     delta = ohlcv['종가'].diff()
@@ -176,6 +176,7 @@ if len(ohlcv) > 0:
     
     # Beta 계산 (KOSPI 대비)
     try:
+        import pandas as pd
         # KOSPI 데이터 가져오기
         kospi = stock.get_index_ohlcv_by_date(
             (end_date - pd.Timedelta(days=365)).strftime('%Y%m%d'),
@@ -200,15 +201,15 @@ if len(ohlcv) > 0:
                 beta = 1.0
         else:
             beta = 1.0
-    except:
+    except Exception as e:
         beta = 1.0  # 계산 실패 시 기본값
     
     result = {
-        'ma5': int(ma5),
-        'ma20': int(ma20),
-        'ma60': int(ma60),
-        'ma120': int(ma120) if ma120 else None,
-        'ma200': int(ma200) if ma200 else None,
+        'ma5': int(ma5) if ma5 > 0 else 0,
+        'ma20': int(ma20) if ma20 > 0 else 0,
+        'ma60': int(ma60) if ma60 > 0 else 0,
+        'ma120': int(ma120) if ma120 > 0 else 0,
+        'ma200': int(ma200) if ma200 > 0 else 0,
         'rsi14': round(rsi, 2),
         'macd': round(macd.iloc[-1], 2),
         'macdSignal': round(signal.iloc[-1], 2),

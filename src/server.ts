@@ -31,7 +31,7 @@ class KoreanStockAnalysisMCP {
     this.server = new Server(
       {
         name: 'korean-stock-analysis',
-        version: '3.0.0',
+        version: '1.0.3',
       },
       {
         capabilities: {
@@ -226,7 +226,7 @@ class KoreanStockAnalysisMCP {
     const { ticker, company_name, report_type = 'quick' } = args;
 
     try {
-      console.log(`[MCP] 빠른 분석 시작: ${company_name || ticker}`);
+      // Debug log removed (causes encoding issues in Claude Desktop)
       
       // 필수 데이터만 수집
       const [marketData, financialData] = await Promise.all([
@@ -268,7 +268,7 @@ class KoreanStockAnalysisMCP {
         ],
       };
     } catch (error) {
-      console.error('[MCP] Analysis error:', error);
+      // Error logging removed (causes encoding issues)
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
@@ -698,7 +698,8 @@ except Exception as e:
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('[MCP] 한국 주식 전문 분석 MCP 서버 v3.0 시작됨');
+    // 버전 정보를 stderr가 아닌 다른 방법으로 처리
+    // console.error는 Claude Desktop 로그에 문제를 일으킬 수 있음
   }
 }
 
