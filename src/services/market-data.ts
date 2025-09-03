@@ -93,21 +93,36 @@ else:
     end_str = end_date.strftime('%Y%m%d')
 
 # OHLCV 데이터
-ohlcv = stock.get_market_ohlcv_by_date(end_str, end_str, ticker)
-if not ohlcv.empty:
-    result = {
-        'currentPrice': int(ohlcv.iloc[0]['종가']),
-        'volume': int(ohlcv.iloc[0]['거래량'])
-    }
-    
-    # 시가총액
-    cap = stock.get_market_cap_by_date(end_str, end_str, ticker)
-    if not cap.empty:
-        result['marketCap'] = int(cap.iloc[0]['시가총액'])
-    
-    print(json.dumps(result, ensure_ascii=False))
-else:
-    print(json.dumps({}, ensure_ascii=False))
+try:
+    ohlcv = stock.get_market_ohlcv_by_date(end_str, end_str, ticker)
+    if not ohlcv.empty:
+        result = {
+            'currentPrice': int(ohlcv.iloc[0]['종가']),
+            'volume': int(ohlcv.iloc[0]['거래량'])
+        }
+        
+        # 시가총액
+        cap = stock.get_market_cap_by_date(end_str, end_str, ticker)
+        if not cap.empty:
+            result['marketCap'] = int(cap.iloc[0]['시가총액'])
+        
+        print(json.dumps(result, ensure_ascii=False))
+    else:
+        # 빈 데이터일 때 최근 거래일 다시 시도
+        ohlcv_recent = stock.get_market_ohlcv_by_ticker(end_str)
+        if ticker in ohlcv_recent.index:
+            result = {
+                'currentPrice': int(ohlcv_recent.loc[ticker, '종가']),
+                'volume': int(ohlcv_recent.loc[ticker, '거래량'])
+            }
+            cap_recent = stock.get_market_cap_by_ticker(end_str)
+            if ticker in cap_recent.index:
+                result['marketCap'] = int(cap_recent.loc[ticker, '시가총액'])
+            print(json.dumps(result, ensure_ascii=False))
+        else:
+            print(json.dumps({'error': 'No data found for ticker ' + ticker}, ensure_ascii=False))
+except Exception as e:
+    print(json.dumps({'error': str(e)}, ensure_ascii=False))
 `;
 
     return await PythonExecutor.execute(pythonCode);

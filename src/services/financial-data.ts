@@ -43,16 +43,26 @@ for i in range(5):
         except:
             continue
     
-    # 데이터가 없으면 기본값
+    # 데이터가 없으면 최신 날짜 강제 시도
     if not found_data and i == 0:
-        fundamentals_history.append({
-            'year': end_date.year,
-            'per': 15.0,
-            'pbr': 1.0,
-            'eps': 2000,
-            'bps': 30000,
-            'div': 2.0
-        })
+        # 최근 거래일 데이터 가져오기
+        for j in range(30):  # 최근 30일 내 데이터 찾기
+            check_date = (end_date - timedelta(days=j)).strftime('%Y%m%d')
+            try:
+                fund = stock.get_market_fundamental_by_ticker(check_date, check_date)
+                if ticker in fund.index:
+                    row = fund.loc[ticker]
+                    fundamentals_history.append({
+                        'year': end_date.year,
+                        'per': float(row['PER']) if row['PER'] != 0 else None,
+                        'pbr': float(row['PBR']) if row['PBR'] != 0 else None,
+                        'eps': int(row['EPS']) if row['EPS'] != 0 else None,
+                        'bps': int(row['BPS']) if row['BPS'] != 0 else None,
+                        'div': float(row['DIV']) if row['DIV'] != 0 else None
+                    })
+                    break
+            except:
+                continue
 
 print(json.dumps(fundamentals_history, ensure_ascii=False))
 `;
@@ -65,14 +75,10 @@ print(json.dumps(fundamentals_history, ensure_ascii=False))
    */
   static async fetchCurrent(ticker: string): Promise<FinancialData> {
     const history = await this.fetch(ticker);
-    return history[0] || {
-      year: new Date().getFullYear(),
-      per: 15,
-      pbr: 1,
-      eps: 0,
-      bps: 0,
-      div: 0,
-    };
+    if (!history[0]) {
+      throw new Error(`재무 데이터를 찾을 수 없습니다: ${ticker}`);
+    }
+    return history[0];
   }
 
   /**
