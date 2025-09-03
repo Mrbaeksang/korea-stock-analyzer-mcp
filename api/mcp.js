@@ -234,25 +234,89 @@ export default async function handler(req, res) {
             tools: [
               {
                 name: 'analyze_equity',
-                description: '한국 주식 종목 종합 분석',
+                description: '한국 주식 종목 종합 분석 (빠른/요약/전체 보고서)',
                 inputSchema: {
                   type: 'object',
                   properties: {
-                    ticker: { type: 'string' },
-                    company_name: { type: 'string' },
-                    report_type: { type: 'string', enum: ['quick', 'summary', 'full'] }
+                    ticker: { type: 'string', description: '종목 코드 (예: 005930)' },
+                    company_name: { type: 'string', description: '회사명 (예: 삼성전자)' },
+                    report_type: { type: 'string', enum: ['quick', 'summary', 'full'], description: '보고서 유형' }
                   },
                   required: ['ticker', 'company_name']
                 }
               },
               {
                 name: 'get_financial_data',
-                description: '재무제표 데이터 조회',
+                description: '재무제표 데이터 조회 (PER, PBR, EPS, BPS, 배당수익률)',
                 inputSchema: {
                   type: 'object',
                   properties: {
-                    ticker: { type: 'string' },
-                    years: { type: 'number' }
+                    ticker: { type: 'string', description: '종목 코드' },
+                    years: { type: 'number', default: 3, description: '조회 기간(년)' }
+                  },
+                  required: ['ticker']
+                }
+              },
+              {
+                name: 'get_technical_indicators',
+                description: '기술적 지표 분석 (이동평균, RSI, MACD, 볼린저밴드)',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    ticker: { type: 'string', description: '종목 코드' }
+                  },
+                  required: ['ticker']
+                }
+              },
+              {
+                name: 'calculate_dcf',
+                description: 'DCF(현금흐름할인) 모델로 적정가치 계산',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    ticker: { type: 'string', description: '종목 코드' },
+                    growth_rate: { type: 'number', default: 10, description: '예상 성장률(%)' },
+                    discount_rate: { type: 'number', default: 10, description: '할인율(%)' }
+                  },
+                  required: ['ticker']
+                }
+              },
+              {
+                name: 'search_news',
+                description: '종목 관련 최신 뉴스 검색',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    company_name: { type: 'string', description: '회사명' },
+                    limit: { type: 'number', default: 5, description: '뉴스 개수' }
+                  },
+                  required: ['company_name']
+                }
+              },
+              {
+                name: 'get_supply_demand',
+                description: '수급 데이터 조회 (외국인, 기관, 개인)',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    ticker: { type: 'string', description: '종목 코드' },
+                    days: { type: 'number', default: 20, description: '조회 기간(일)' }
+                  },
+                  required: ['ticker']
+                }
+              },
+              {
+                name: 'compare_peers',
+                description: '동종업계 비교 분석 (자동으로 유사 종목 탐지)',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    ticker: { type: 'string', description: '종목 코드' },
+                    peer_tickers: { 
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: '비교할 종목들 (미입력시 자동 탐지)'
+                    }
                   },
                   required: ['ticker']
                 }
