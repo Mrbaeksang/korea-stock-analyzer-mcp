@@ -1,20 +1,82 @@
 # Korea Stock Analyzer MCP Server
 
-A Model Context Protocol (MCP) server that provides comprehensive Korean stock market analysis using strategies from 6 legendary investors: Warren Buffett, Peter Lynch, Benjamin Graham, Joel Greenblatt, Philip Fisher, and John Templeton.
+[English](#english) | [한국어](#korean)
 
-## Features
+---
 
-- 📊 **Real-time Korean stock data** - Direct access to KOSPI/KOSDAQ data via pykrx (no API key required)
-- 🎯 **6 Investment Strategies** - Analysis based on proven methodologies from investment legends
-- 📈 **7 Powerful Tools** - Complete toolkit for stock analysis and valuation
-- 🚀 **Zero Configuration** - Works out of the box with Claude Desktop
+<a name="english"></a>
+## 🇺🇸 English
+
+A Model Context Protocol (MCP) server that provides comprehensive Korean stock market analysis using strategies from 6 legendary investors.
+
+### Features
+
+- 📊 **Real-time Korean stock data** - Direct access to KOSPI/KOSDAQ data via pykrx
+- 🎯 **6 Investment Strategies** - Analysis based on proven methodologies
+- 📈 **7 Powerful Tools** - Complete toolkit for stock analysis
+- 🚀 **Zero Configuration** - Works out of the box
 - 🇰🇷 **Korean Market Focused** - Optimized for Korean equity analysis
 
-## Installation
+### Quick Start
 
-### For Claude Desktop Users
+Add to Claude Desktop config:
 
-Add this configuration to your Claude Desktop config file:
+```json
+{
+  "mcpServers": {
+    "korea-stock-analyzer": {
+      "command": "npx",
+      "args": ["@mrbaeksang/korea-stock-analyzer-mcp"]
+    }
+  }
+}
+```
+
+### Available Tools
+
+1. **get_financial_data** - PER, PBR, EPS, ROE, dividend yield
+2. **get_technical_indicators** - MA, RSI, MACD, 52-week high/low
+3. **calculate_dcf** - Intrinsic value calculation
+4. **search_news** - Latest news and sentiment
+5. **get_supply_demand** - Institutional/foreign investor analysis
+6. **compare_peers** - Industry peer comparison
+7. **analyze_equity** - Complete analysis with all strategies
+
+### Example Usage
+
+```
+"Analyze Samsung Electronics stock"
+"Calculate DCF for SK Hynix"
+"Compare NAVER with Kakao"
+```
+
+### Investment Strategies
+
+- 🎩 **Warren Buffett** - Owner Earnings, ROE focus
+- 📊 **Peter Lynch** - PEGY Ratio analysis
+- 💼 **Benjamin Graham** - Graham Number valuation
+- 🎯 **Joel Greenblatt** - Magic Formula ranking
+- 🔍 **Philip Fisher** - 15-Point growth checklist
+- 🌍 **John Templeton** - Maximum pessimism approach
+
+---
+
+<a name="korean"></a>
+## 🇰🇷 한국어
+
+6명의 전설적인 투자자들의 전략을 활용한 한국 주식 시장 종합 분석 MCP 서버입니다.
+
+### 주요 기능
+
+- 📊 **실시간 한국 주식 데이터** - pykrx를 통한 KOSPI/KOSDAQ 직접 접근
+- 🎯 **6가지 투자 전략** - 검증된 투자 방법론 기반 분석
+- 📈 **7개의 강력한 도구** - 주식 분석을 위한 완벽한 툴킷
+- 🚀 **설정 불필요** - 즉시 사용 가능
+- 🇰🇷 **한국 시장 특화** - 한국 주식 분석에 최적화
+
+### 빠른 시작
+
+Claude Desktop 설정에 추가:
 
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`  
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -30,199 +92,131 @@ Add this configuration to your Claude Desktop config file:
 }
 ```
 
-### For Developers
+### 사용 가능한 도구
+
+1. **get_financial_data** - PER, PBR, EPS, ROE, 배당수익률 조회
+2. **get_technical_indicators** - 이동평균, RSI, MACD, 52주 최고/최저
+3. **calculate_dcf** - DCF 기반 적정가치 계산
+4. **search_news** - 최신 뉴스 및 감성 분석
+5. **get_supply_demand** - 기관/외국인 수급 분석
+6. **compare_peers** - 동종업계 비교 분석
+7. **analyze_equity** - 모든 전략을 활용한 종합 분석
+
+### 사용 예시
+
+```
+"삼성전자 주식 분석해줘"
+"SK하이닉스 DCF 계산해줘"
+"네이버와 카카오 비교해줘"
+"현대차 수급 분석 보여줘"
+"LG화학 기술적 지표 확인"
+```
+
+### 투자 전략
+
+- 🎩 **워런 버핏** - 오너 어닝스, 높은 ROE 중심
+- 📊 **피터 린치** - PEGY 비율 분석
+- 💼 **벤저민 그레이엄** - 그레이엄 수치 기반 평가
+- 🎯 **조엘 그린블라트** - 매직 포뮬러 순위
+- 🔍 **필립 피셔** - 15가지 성장성 체크리스트
+- 🌍 **존 템플턴** - 최대 비관 시점 투자
+
+### 설치 방법
+
+#### NPM 패키지 사용 (권장)
 
 ```bash
-# Clone the repository
+npx @mrbaeksang/korea-stock-analyzer-mcp
+```
+
+#### 소스코드에서 빌드
+
+```bash
+# 저장소 복제
 git clone https://github.com/Mrbaeksang/korea-stock-analyzer-mcp.git
 cd korea-stock-analyzer-mcp
 
-# Install dependencies
+# 의존성 설치
 npm install
 
-# Build the project
+# 빌드
 npm run build
 
-# Run the server
+# 실행
 npm start
 ```
 
-## Available Tools
+### 요구사항
 
-### 1. `get_financial_data`
-Fetches comprehensive financial data including PER, PBR, EPS, BPS, ROE, and dividend yield.
+- Node.js 18 이상
+- Python 3.9 이상 (자동 처리됨)
+- Claude Desktop (MCP 통합용)
 
-```typescript
-// Example usage in Claude
-"Get financial data for Samsung Electronics"
-```
+### Python 의존성
 
-### 2. `get_technical_indicators`
-Provides technical analysis with moving averages, RSI, MACD, and 52-week high/low positions.
+서버가 자동으로 필요한 Python 패키지를 설치합니다:
+- `pykrx` - 한국 주식 시장 데이터
+- `pandas` - 데이터 처리
+- `numpy` - 수치 계산
 
-```typescript
-// Example usage in Claude
-"Show technical indicators for SK Hynix"
-```
-
-### 3. `calculate_dcf`
-Calculates intrinsic value using Discounted Cash Flow analysis.
-
-```typescript
-// Example usage in Claude
-"Calculate DCF valuation for LG Electronics"
-```
-
-### 4. `search_news`
-Searches latest news and sentiment analysis (requires Naver API keys).
-
-```typescript
-// Example usage in Claude
-"Find recent news about POSCO"
-```
-
-### 5. `get_supply_demand`
-Analyzes institutional and foreign investor trading patterns over 5/20/60 day periods.
-
-```typescript
-// Example usage in Claude
-"Check supply and demand for Kakao"
-```
-
-### 6. `compare_peers`
-Compares valuation metrics with industry peers.
-
-```typescript
-// Example usage in Claude
-"Compare Samsung Electronics with SK Hynix"
-```
-
-### 7. `analyze_equity`
-**The Ultimate Tool** - Comprehensive analysis using all 6 investment gurus' strategies with buy/hold/sell recommendations.
-
-```typescript
-// Example usage in Claude
-"Analyze NAVER using all investment strategies"
-```
-
-## Investment Strategies
-
-### 🎩 Warren Buffett
-- **Owner Earnings**: Net Income + Depreciation - Maintenance CapEx
-- **Focus**: High ROE (>15%), sustainable competitive advantages
-
-### 📊 Peter Lynch  
-- **PEGY Ratio**: PER / (Growth Rate + Dividend Yield)
-- **Target**: PEGY < 1.0 indicates undervaluation
-
-### 💼 Benjamin Graham
-- **Graham Number**: √(22.5 × EPS × BPS)
-- **Safety Margin**: Buy when price < 67% of Graham Number
-
-### 🎯 Joel Greenblatt
-- **Magic Formula**: High EBIT/EV + High ROIC
-- **Ranking**: Combines value and quality metrics
-
-### 🔍 Philip Fisher
-- **15-Point Checklist**: Qualitative business assessment
-- **Growth Focus**: Long-term growth potential
-
-### 🌍 John Templeton
-- **Maximum Pessimism**: Buy at point of maximum pessimism
-- **Contrarian**: Focus on out-of-favor stocks
-
-## Example Usage
-
-```python
-# In Claude Desktop, simply ask:
-"Analyze Samsung Electronics stock"
-"Is POSCO a good value investment?"
-"Compare KB Financial with other banks"
-"Show me undervalued stocks in KOSPI"
-```
-
-## Requirements
-
-- Node.js 18+
-- Python 3.9+ (automatically handled)
-- Claude Desktop (for MCP integration)
-
-## Python Dependencies
-
-The server automatically installs required Python packages:
-- `pykrx` - Korean stock market data
-- `pandas` - Data manipulation
-- `numpy` - Numerical computations
-
-## Configuration
-
-No configuration required! The server works out of the box with Korean stock data.
-
-For advanced users who want news search functionality:
-1. Get Naver API credentials from [Naver Developers](https://developers.naver.com)
-2. Set environment variables:
-   ```bash
-   NAVER_CLIENT_ID=your_client_id
-   NAVER_CLIENT_SECRET=your_client_secret
-   ```
-
-## Development
+### 개발
 
 ```bash
-# Install dependencies
+# 의존성 설치
 npm install
 
-# Run in development mode
+# 개발 모드 실행
 npm run dev
 
-# Build for production
+# 프로덕션 빌드
 npm run build
 
-# Run tests
+# 테스트 실행
 npm test
 ```
 
-## Architecture
+### 프로젝트 구조
 
 ```
 ├── src/
-│   ├── server.ts           # Main MCP server
-│   ├── services/           # Core services
-│   │   ├── data-fetcher.ts # pykrx data fetching
-│   │   ├── calculator.ts   # DCF calculations
-│   │   └── supply-demand.ts # Trading volume analysis
-│   └── analyzers/          # Investment strategies
-│       ├── buffett.ts      # Buffett's Owner Earnings
-│       ├── lynch.ts        # Lynch's PEGY
-│       ├── graham.ts       # Graham Number
-│       ├── greenblatt.ts   # Magic Formula
-│       ├── fisher.ts       # 15-Point Checklist
-│       └── templeton.ts    # Maximum Pessimism
+│   ├── server.ts           # 메인 MCP 서버
+│   ├── services/           # 핵심 서비스
+│   │   ├── financial-data.ts  # 재무 데이터
+│   │   ├── market-data.ts     # 시장 데이터
+│   │   ├── supply-demand.ts   # 수급 분석
+│   │   └── python-executor.ts # Python 실행
+│   └── analyzers/          # 투자 전략
+│       ├── buffett.ts      # 버핏 전략
+│       ├── lynch.ts        # 린치 전략
+│       ├── graham.ts       # 그레이엄 전략
+│       ├── greenblatt.ts   # 그린블라트 전략
+│       ├── fisher.ts       # 피셔 전략
+│       └── templeton.ts    # 템플턴 전략
 ```
 
-## Contributing
+### 기여하기
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+기여를 환영합니다! Pull Request를 보내주세요.
 
-## License
+### 라이선스
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT 라이선스 - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
 
-## Acknowledgments
+### 감사의 말
 
-- [pykrx](https://github.com/sharebook-kr/pykrx) - Korean stock market data
+- [pykrx](https://github.com/sharebook-kr/pykrx) - 한국 주식 시장 데이터
 - [Anthropic](https://anthropic.com) - Model Context Protocol
-- Investment strategy inspirations from legendary investors
+- 전설적인 투자자들의 투자 전략
 
-## Support
+### 지원
 
-- 🐛 [Report Issues](https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/issues)
-- 💬 [Discussions](https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/discussions)
-- ⭐ Star this repo if you find it useful!
+- 🐛 [이슈 리포트](https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/issues)
+- 💬 [토론](https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/discussions)
+- ⭐ 유용하다면 스타를 눌러주세요!
 
-## Disclaimer
+### 면책 조항
 
-This tool is for educational and research purposes only. Not financial advice. Always do your own research before making investment decisions.
+이 도구는 교육 및 연구 목적으로만 사용하세요. 투자 조언이 아닙니다. 투자 결정 전 반드시 본인의 판단으로 결정하세요.
 
 ---
 

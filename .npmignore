@@ -1,0 +1,40 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+
+# Test files
+test/
+*.test.js
+*.spec.js
+test-*.py
+*.pyc
+__pycache__/
+
+# Config files
+tsconfig.json
+.gitignore
+.npmignore
+RELEASE-CHECKLIST.md
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.github/
+
+# Temporary
+*.tmp
+*.bak
+temp/
+tmp/

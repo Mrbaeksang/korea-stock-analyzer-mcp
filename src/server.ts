@@ -268,15 +268,15 @@ class KoreanStockAnalysisMCP {
         ],
       };
     } catch (error) {
-      console.error('[MCP] 분석 중 오류:', error);
+      console.error('[MCP] Analysis error:', error);
       
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       return {
         content: [
           {
             type: 'text',
-            text: `❌ 분석 중 오류가 발생했습니다: ${errorMessage}`,
+            text: JSON.stringify({ error: `Analysis failed: ${errorMessage}` }),
           },
         ],
       };
@@ -421,21 +421,98 @@ class KoreanStockAnalysisMCP {
     const { ticker, peer_tickers = [] } = args;
     
     try {
-      // peer_tickers가 없으면 간단 메시지 반환
+      // 자동 동종업계 탐지
+      let finalPeerTickers = peer_tickers;
+      
       if (!peer_tickers || peer_tickers.length === 0) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                mainTicker: ticker,
-                message: "동종업계 비교를 위해 peer_tickers를 지정해주세요",
-                example: "peer_tickers: ['000660', '066570']",
-                status: "ready"
-              }, null, 2)
-            }
-          ]
-        };
+        // Python을 사용해 pykrx로 동종업계 자동 탐지
+        const pythonCode = `
+import json
+from pykrx import stock
+from datetime import datetime
+
+ticker = '${ticker}'
+today = datetime.now().strftime('%Y%m%d')
+
+try:
+    # 시가총액 가져오기
+    market_cap = stock.get_market_cap_by_ticker(today)
+    if ticker not in market_cap.index:
+        raise ValueError(f"Ticker {ticker} not found")
+    
+    target_cap = market_cap.loc[ticker, '시가총액']
+    
+    # 시가총액 유사 종목 찾기 (±50% 범위)
+    similar_caps = market_cap[
+        (market_cap['시가총액'] >= target_cap * 0.5) & 
+        (market_cap['시가총액'] <= target_cap * 1.5) &
+        (market_cap.index != ticker)
+    ].sort_values('시가총액', ascending=False)
+    
+    # 상위 5개 종목 선택
+    peer_tickers = similar_caps.index[:5].tolist()
+    
+    result = {
+        'ticker': ticker,
+        'peer_tickers': peer_tickers,
+        'method': 'market_cap_similarity'
+    }
+    
+except Exception as e:
+    # 에러시 하드코딩된 기본값 사용
+    default_map = {
+        '005930': ['000660', '005935'],  # 삼성전자
+        '000660': ['005930', '005935'],  # SK하이닉스
+        '005380': ['000270', '012330'],  # 현대차
+        '035720': ['035420'],  # 카카오
+        '035420': ['035720'],  # 네이버
+    }
+    result = {
+        'ticker': ticker,
+        'peer_tickers': default_map.get(ticker, []),
+        'method': 'fallback_default',
+        'error': str(e)
+    }
+
+print(json.dumps(result))
+`;
+        
+        try {
+          const result = await PythonExecutor.execute(pythonCode);
+          finalPeerTickers = result.peer_tickers || [];
+          
+          if (finalPeerTickers.length === 0) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    mainTicker: ticker,
+                    message: "Could not find peers automatically",
+                    suggestion: "Please specify peer_tickers manually",
+                    example: "peer_tickers: ['000660', '066570']"
+                  }, null, 2)
+                }
+              ]
+            };
+          }
+        } catch (pythonError) {
+          console.error('Auto peer detection failed:', pythonError);
+          // Python 실패시 빈 배열 반환
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  mainTicker: ticker,
+                  error: "Auto-detection failed",
+                  suggestion: "Please specify peer_tickers manually",
+                  example: "peer_tickers: ['000660', '066570']"
+                }, null, 2)
+              }
+            ]
+          };
+        }
       }
       
       // peer가 있을 때만 실제 비교
@@ -456,7 +533,7 @@ class KoreanStockAnalysisMCP {
       };
       
       // 비교 종목들 데이터 수집
-      const companies = [ticker, ...peer_tickers];
+      const companies = [ticker, ...finalPeerTickers];
       const comparisonData: any[] = [mainCompany];
       
       // 병렬 처리로 속도 개선
@@ -558,40 +635,51 @@ class KoreanStockAnalysisMCP {
 
   // 네이버 뉴스 크롤링 (간단한 구현)
   private async fetchNewsFromNaver(companyName: string, limit: number): Promise<string> {
+    // Google News RSS 피드를 통한 실제 뉴스 수집
     const pythonCode = `
-import requests
-from bs4 import BeautifulSoup
 import json
-
-query = "${companyName}"
-url = f"https://search.naver.com/search.naver?where=news&query={query}"
+import urllib.request
+import urllib.parse
+from datetime import datetime
+import re
 
 try:
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
+    query = "${companyName} 주식"
+    encoded_query = urllib.parse.quote(query)
+    
+    # Google News RSS 피드 사용
+    url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ko&gl=KR&ceid=KR:ko"
+    
+    with urllib.request.urlopen(url) as response:
+        content = response.read().decode('utf-8')
+    
+    # RSS 파싱 (간단한 정규식 사용)
+    items = re.findall(r'<item>.*?</item>', content, re.DOTALL)
     
     news_items = []
-    news_elements = soup.select('.news_tit')[:${limit}]
-    
-    for elem in news_elements:
-        news_items.append({
-            'title': elem.get_text(),
-            'link': elem.get('href', '')
-        })
+    for item in items[:${limit}]:
+        title_match = re.search(r'<title><!\[CDATA\[(.*?)\]\]></title>', item)
+        link_match = re.search(r'<link>(.*?)</link>', item)
+        pub_date_match = re.search(r'<pubDate>(.*?)</pubDate>', item)
+        
+        if title_match and link_match:
+            news_items.append({
+                'title': title_match.group(1).split(' - ')[0],  # 출처 제거
+                'link': link_match.group(1),
+                'date': pub_date_match.group(1) if pub_date_match else ''
+            })
     
     print(json.dumps(news_items, ensure_ascii=False))
 except Exception as e:
-    print(json.dumps({'error': str(e)}, ensure_ascii=False))
+    # 실패 시 빈 배열 반환
+    print(json.dumps([]))
 `;
     
     try {
       const result = await PythonExecutor.execute(pythonCode);
-      return `최신 뉴스:\n${result}`;
-    } catch {
-      return '뉴스 검색 중 오류가 발생했습니다.';
+      return JSON.stringify(result);
+    } catch (error) {
+      return JSON.stringify([]);
     }
   }
 
@@ -601,7 +689,7 @@ except Exception as e:
       content: [
         {
           type: 'text',
-          text: `❌ 오류: ${error.message || '알 수 없는 오류'}`,
+          text: JSON.stringify({ error: error.message || 'Unknown error' }),
         },
       ],
     };

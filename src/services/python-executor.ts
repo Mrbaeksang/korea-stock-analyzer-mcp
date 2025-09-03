@@ -13,10 +13,13 @@ export class PythonExecutor {
    */
   static async execute(pythonCode: string): Promise<any> {
     try {
-      // UTF-8 인코딩 설정 추가
+      // UTF-8 인코딩 설정 및 경고 억제
       const wrappedCode = `
 import sys
 import json
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='pykrx')
+warnings.filterwarnings('ignore', message='.*pkg_resources.*')
 sys.stdout.reconfigure(encoding='utf-8')
 ${pythonCode}
 `;
