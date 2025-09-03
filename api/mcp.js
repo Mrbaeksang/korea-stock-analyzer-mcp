@@ -77,11 +77,17 @@ export default async function handler(req, res) {
   // GET 요청: 도구 목록 및 서버 정보 반환
   if (req.method === 'GET') {
     return res.status(200).json({
-      name: 'Korean Stock Analyzer MCP',
-      version: '1.1.1',
-      description: '한국 주식 시장 전문 분석 도구',
-      author: 'Mrbaeksang',
-      tools: [
+      jsonrpc: '2.0',
+      id: req.query.id || '1',
+      result: {
+        name: 'Korean Stock Analyzer MCP',
+        version: '1.1.1',
+        description: '한국 주식 시장 전문 분석 도구',
+        author: 'Mrbaeksang',
+        capabilities: {
+          tools: {}
+        },
+        tools: [
         {
           name: 'analyze_equity',
           description: '한국 주식 종목 종합 분석 (빠른/요약/전체 보고서)',
@@ -176,6 +182,7 @@ export default async function handler(req, res) {
           }
         }
       ]
+    }
     });
   }
 
