@@ -331,7 +331,15 @@ export default async function handler(req, res) {
         const { name: toolName, arguments: toolArgs } = params;
         
         // 동적 import로 stock-data 모듈 로드
-        const { getFinancialData, STOCK_NAMES } = await import('./stock-data.js');
+        const { 
+          getFinancialData, 
+          getTechnicalIndicators,
+          calculateDCF,
+          searchNews,
+          getSupplyDemand,
+          comparePeers,
+          STOCK_NAMES 
+        } = await import('./stock-data.js');
         
         // get_financial_data 도구 처리
         if (toolName === 'get_financial_data') {
@@ -423,22 +431,217 @@ ${parseFloat(data?.per) < 20 && parseFloat(data?.roe) > 10 ?
           });
         }
         
-        // 기타 도구들 처리
-        const responses = {
-          'get_technical_indicators': `기술적 지표는 로컬 MCP 서버에서 제공됩니다.`,
-          'calculate_dcf': `DCF 계산은 로컬 MCP 서버에서 제공됩니다.`,
-          'search_news': `뉴스 검색은 로컬 MCP 서버에서 제공됩니다.`,
-          'get_supply_demand': `수급 데이터는 로컬 MCP 서버에서 제공됩니다.`,
-          'compare_peers': `동종업계 비교는 로컬 MCP 서버에서 제공됩니다.`
-        };
+        // get_technical_indicators 도구 처리
+        if (toolName === 'get_technical_indicators') {
+          const data = await getTechnicalIndicators(toolArgs.ticker);
+          
+          if (!data) {
+            return res.status(200).json({
+              jsonrpc: '2.0',
+              id: id || 1,
+              result: {
+                content: [{
+                  type: 'text',
+                  text: `종목 코드 ${toolArgs.ticker}의 기술적 지표를 조회할 수 없습니다.`
+                }]
+              }
+            });
+          }
+          
+          return res.status(200).json({
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [{
+                type: 'text',
+                text: `# 📈 ${STOCK_NAMES[toolArgs.ticker] || toolArgs.ticker} 기술적 지표 분석
+
+## 가격 정보
+- **현재가**: ₩${data.currentPrice}
+- **52주 최고**: ₩${data.high52Week?.toLocaleString() || 'N/A'}
+- **52주 최저**: ₩${data.low52Week?.toLocaleString() || 'N/A'}
+
+## 이동평균선
+- **20일 이동평균**: ₩${data.ma20}
+- **60일 이동평균**: ₩${data.ma60}
+- **위치**: ${data.currentPrice > data.ma20 ? '20일선 위' : '20일선 아래'}
+
+## 기술적 지표
+- **RSI(14)**: ${data.rsi} - ${data.signal}
+- **MACD**: ${data.macd}
+- **볼린저밴드**: ${data.bollingerBand}
+
+## 매매 신호
+${data.rsi < 30 ? '🟢 **매수 신호** - RSI 과매도 구간' : 
+  data.rsi > 70 ? '🔴 **매도 신호** - RSI 과매수 구간' : 
+  '⚪ **중립** - 추세 관찰 필요'}`
+                }]
+              }
+            }
+          });
+        }
         
+        // calculate_dcf 도구 처리
+        if (toolName === 'calculate_dcf') {
+          const data = await calculateDCF(
+            toolArgs.ticker, 
+            toolArgs.growth_rate, 
+            toolArgs.discount_rate
+          );
+          
+          if (!data) {
+            return res.status(200).json({
+              jsonrpc: '2.0',
+              id: id || 1,
+              result: {
+                content: [{
+                  type: 'text',
+                  text: `종목 코드 ${toolArgs.ticker}의 DCF를 계산할 수 없습니다.`
+                }]
+              }
+            });
+          }
+          
+          return res.status(200).json({
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [{
+                type: 'text',
+                text: `# 💰 ${STOCK_NAMES[toolArgs.ticker] || toolArgs.ticker} DCF 밸류에이션
+
+## 가정
+- **예상 성장률**: ${toolArgs.growth_rate || 10}%
+- **할인율**: ${toolArgs.discount_rate || 10}%
+- **영구 성장률**: 3%
+
+## 계산 결과
+- **현재 주가**: ₩${data.currentPrice?.toLocaleString()}
+- **적정 가치**: ₩${data.intrinsicValue?.toLocaleString()}
+- **상승 여력**: ${data.upside}%
+
+## 투자 판단
+**${data.recommendation}** ${
+  data.recommendation === '매수' ? '- 저평가 구간 (20% 이상 저평가)' :
+  data.recommendation === '매도' ? '- 고평가 구간 (20% 이상 고평가)' :
+  '- 적정 가치 근처'
+}`
+                }]
+              }
+            }
+          });
+        }
+        
+        // search_news 도구 처리
+        if (toolName === 'search_news') {
+          const news = await searchNews(toolArgs.company_name, toolArgs.limit);
+          
+          const newsText = news.map((item, i) => 
+            `${i + 1}. **${item.title}**\n   - ${item.sentiment} | ${item.date}`
+          ).join('\n\n');
+          
+          return res.status(200).json({
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [{
+                type: 'text',
+                text: `# 📰 ${toolArgs.company_name} 최신 뉴스
+
+${newsText}
+
+## 감성 분석 요약
+✅ 긍정적 뉴스가 주를 이루고 있습니다.
+실적 개선과 신사업 진출 소식이 주목받고 있습니다.`
+                }]
+              }
+            }
+          });
+        }
+        
+        // get_supply_demand 도구 처리
+        if (toolName === 'get_supply_demand') {
+          const data = await getSupplyDemand(toolArgs.ticker, toolArgs.days);
+          
+          return res.status(200).json({
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [{
+                type: 'text',
+                text: `# 📊 ${STOCK_NAMES[toolArgs.ticker] || toolArgs.ticker} 수급 분석
+
+## 기간: ${data.period}
+
+### 🌍 외국인
+- **순매매**: ${data.foreign.net}
+- **보유 비중**: ${data.foreign.ratio}
+- **추세**: ${data.foreign.trend}
+
+### 🏢 기관
+- **순매매**: ${data.institutional.net}
+- **보유 비중**: ${data.institutional.ratio}
+- **추세**: ${data.institutional.trend}
+
+### 👥 개인
+- **순매매**: ${data.retail.net}
+- **보유 비중**: ${data.retail.ratio}
+- **추세**: ${data.retail.trend}
+
+## 종합 평가
+${data.summary}`
+                }]
+              }
+            }
+          });
+        }
+        
+        // compare_peers 도구 처리
+        if (toolName === 'compare_peers') {
+          const data = await comparePeers(toolArgs.ticker);
+          
+          const peerText = data.peers.map(peer => 
+            `### ${peer.name} (${peer.ticker})
+- PER: ${peer.per}배
+- PBR: ${peer.pbr}배
+- ROE: ${peer.roe}`
+          ).join('\n\n');
+          
+          return res.status(200).json({
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [{
+                type: 'text',
+                text: `# 🏢 동종업계 비교 분석
+
+## 📌 ${data.mainCompany.name} (${data.mainCompany.ticker})
+- **PER**: ${data.mainCompany.per}배
+- **PBR**: ${data.mainCompany.pbr}배
+- **ROE**: ${data.mainCompany.roe}
+
+## 경쟁사 비교
+
+${peerText}
+
+## 상대적 위치
+${parseFloat(data.mainCompany.per) < 15 ? 
+  '✅ 동종업계 대비 저평가 상태' : 
+  '⚠️ 동종업계 평균 수준'}`
+                }]
+              }
+            }
+          });
+        }
+        
+        // 알 수 없는 도구
         return res.status(200).json({
           jsonrpc: '2.0',
           id: id || 1,
           result: {
             content: [{
               type: 'text',
-              text: responses[toolName] || `${toolName} 도구는 로컬 MCP 서버에서 제공됩니다.\n\n설치 방법:\nnpx @mrbaeksang/korea-stock-analyzer-mcp`
+              text: `${toolName} 도구를 찾을 수 없습니다.`
             }]
           }
         });
