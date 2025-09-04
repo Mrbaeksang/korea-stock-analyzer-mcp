@@ -54,7 +54,7 @@ if (typeof setInterval !== 'undefined') {
 }
 
 // 실제 주식 데이터 함수들 (stock-data.js에서 구현)
-import * as stockData from './stock-data';
+import * as stockData from './stock-data.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void | VercelResponse> {
   // 레이트 리미팅 체크
