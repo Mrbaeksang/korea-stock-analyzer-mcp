@@ -515,11 +515,25 @@ ${(data.foreign && data.foreign > 0) && (data.institution && data.institution > 
             
             case 'compare_peers': {
               const data = await stockData.comparePeers(args.ticker, args.peer_tickers);
-              result = {
-                content: [
-                  {
-                    type: 'text',
-                    text: `🔍 동종업계 비교 분석
+              
+              if (!data || data.length === 0) {
+                result = {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `🔍 동종업계 비교 분석
+
+데이터를 가져오는 중 오류가 발생했습니다.
+다시 시도해주세요.`
+                    }
+                  ]
+                };
+              } else {
+                result = {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `🔍 동종업계 비교 분석
 
 ${data.map((company: any) => `
 **${company.name} (${company.ticker})**
@@ -532,14 +546,15 @@ ${data.map((company: any) => `
 `).join('\n')}
 
 **상대 밸류에이션**
-${data[0] && data[0].per ? 
+${data.length > 1 && data[0] && data[0].per && data[0].per !== 'N/A' ? 
   `- ${args.ticker}의 PER이 업계 평균 대비 ${
     parseFloat(data[0].per) < data.slice(1).reduce((acc: number, cur: any) => acc + (parseFloat(cur.per) || 0), 0) / (data.length - 1) ?
     '낮음 (저평가)' : '높음 (고평가)'
-  }` : ''}`
-                  }
-                ]
-              };
+  }` : '- PER 비교 데이터 부족'}`
+                    }
+                  ]
+                };
+              }
               break;
             }
             
