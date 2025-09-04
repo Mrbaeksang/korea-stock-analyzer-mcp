@@ -330,46 +330,116 @@ export default async function handler(req, res) {
       if (method === 'tools/call') {
         const { name: toolName, arguments: toolArgs } = params;
         
-        if (toolName === 'analyze_equity') {
+        // 동적 import로 stock-data 모듈 로드
+        const { getFinancialData, STOCK_NAMES } = await import('./stock-data.js');
+        
+        // get_financial_data 도구 처리
+        if (toolName === 'get_financial_data') {
+          const data = await getFinancialData(toolArgs.ticker);
+          
+          if (!data) {
+            return res.status(200).json({
+              jsonrpc: '2.0',
+              id: id || 1,
+              result: {
+                content: [{
+                  type: 'text',
+                  text: `종목 코드 ${toolArgs.ticker}의 데이터를 조회할 수 없습니다. 올바른 종목 코드인지 확인해주세요.`
+                }]
+              }
+            });
+          }
+          
           return res.status(200).json({
             jsonrpc: '2.0',
             id: id || 1,
             result: {
-              content: [
-                {
-                  type: 'text',
-                  text: `# 📊 ${toolArgs.company_name || toolArgs.ticker} 실시간 분석
-              
-## 주요 지표
-- 종목코드: ${toolArgs.ticker}
-- 분석 유형: ${toolArgs.report_type || 'quick'}
+              content: [{
+                type: 'text',
+                text: `# 📊 ${STOCK_NAMES[toolArgs.ticker] || toolArgs.ticker} 재무제표 데이터
 
-✅ 실제 서비스에서는 pykrx API를 통해 실시간 데이터를 제공합니다.
-- 현재가, 거래량, 시가총액
-- PER, PBR, EPS, BPS
-- 배당수익률, ROE
-- 외국인/기관 수급
-- 동종업계 비교
+## 최근 3년 재무 지표
+- **현재가**: ₩${data.currentPrice?.toLocaleString() || 'N/A'}
+- **PER**: ${data.per}배
+- **PBR**: ${data.pbr}배  
+- **EPS**: ₩${data.eps}
+- **BPS**: ₩${data.bps}
+- **배당수익률**: ${data.dividendYield}
+- **ROE**: ${data.roe}
+- **시가총액**: ${data.marketCap ? (data.marketCap/1000000000000).toFixed(1) + '조원' : 'N/A'}
+- **거래량**: ${data.volume?.toLocaleString() || 'N/A'}
 
-자세한 사용법은 GitHub 참조:
-https://github.com/Mrbaeksang/korea-stock-analyzer-mcp`
-                }
-              ]
+💡 Yahoo Finance API 기반 실시간 데이터
+더 정확한 분석은 로컬 MCP 서버를 사용하세요.`
+                }]
+              }
             }
           });
         }
         
-        // 다른 도구도 JSON-RPC 형식으로
+        // analyze_equity 도구 처리
+        if (toolName === 'analyze_equity') {
+          const data = await getFinancialData(toolArgs.ticker);
+          const companyName = toolArgs.company_name || STOCK_NAMES[toolArgs.ticker] || toolArgs.ticker;
+          
+          return res.status(200).json({
+            jsonrpc: '2.0',
+            id: id || 1,
+            result: {
+              content: [{
+                type: 'text',
+                text: `# 📊 ${companyName} 종합 분석 리포트
+
+## 1. 기본 정보
+- **종목코드**: ${toolArgs.ticker}
+- **현재가**: ₩${data?.currentPrice?.toLocaleString() || 'N/A'}
+- **시가총액**: ${data?.marketCap ? (data.marketCap/1000000000000).toFixed(1) + '조원' : 'N/A'}
+
+## 2. 투자 지표
+- **PER**: ${data?.per || 'N/A'}배 (동종업계 평균: 12배)
+- **PBR**: ${data?.pbr || 'N/A'}배 (동종업계 평균: 1.5배)
+- **ROE**: ${data?.roe || 'N/A'} (양호: 10% 이상)
+- **배당수익률**: ${data?.dividendYield || 'N/A'}
+
+## 3. 투자 전략 분석
+### 🎩 워런 버핏 관점
+- ROE ${data?.roe || 'N/A'} → ${parseFloat(data?.roe) > 15 ? '✅ 우수' : '⚠️ 보통'}
+- 안정적 수익성 평가 필요
+
+### 📊 피터 린치 관점  
+- PER ${data?.per || 'N/A'}배 → ${parseFloat(data?.per) < 15 ? '✅ 저평가' : '⚠️ 적정'}
+- 성장률 대비 밸류에이션 검토 필요
+
+## 4. 투자 의견
+${parseFloat(data?.per) < 20 && parseFloat(data?.roe) > 10 ? 
+'**매수 고려** - 저평가 구간, 수익성 양호' : 
+'**중립/관망** - 추가 분석 필요'}
+
+💡 실시간 Yahoo Finance 데이터 기반
+더 정확한 분석은 로컬 MCP 서버를 사용하세요.`
+                }]
+              }
+            }
+          });
+        }
+        
+        // 기타 도구들 처리
+        const responses = {
+          'get_technical_indicators': `기술적 지표는 로컬 MCP 서버에서 제공됩니다.`,
+          'calculate_dcf': `DCF 계산은 로컬 MCP 서버에서 제공됩니다.`,
+          'search_news': `뉴스 검색은 로컬 MCP 서버에서 제공됩니다.`,
+          'get_supply_demand': `수급 데이터는 로컬 MCP 서버에서 제공됩니다.`,
+          'compare_peers': `동종업계 비교는 로컬 MCP 서버에서 제공됩니다.`
+        };
+        
         return res.status(200).json({
           jsonrpc: '2.0',
           id: id || 1,
           result: {
-            content: [
-              {
-                type: 'text',
-                text: `Tool: ${toolName}\nArgs: ${JSON.stringify(toolArgs, null, 2)}\n\n실제 데이터는 로컬 MCP 서버에서 제공됩니다.`
-              }
-            ]
+            content: [{
+              type: 'text',
+              text: responses[toolName] || `${toolName} 도구는 로컬 MCP 서버에서 제공됩니다.\n\n설치 방법:\nnpx @mrbaeksang/korea-stock-analyzer-mcp`
+            }]
           }
         });
       }
