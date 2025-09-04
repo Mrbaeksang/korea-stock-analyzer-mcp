@@ -205,6 +205,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     try {
       const { method, params, id } = req.body;
       
+      // initialize 메서드 (필수)
+      if (method === 'initialize') {
+        return res.status(200).json({
+          jsonrpc: '2.0',
+          id: id || 1,
+          result: {
+            protocolVersion: '1.0.0',
+            capabilities: {
+              tools: {},
+              resources: {}
+            },
+            serverInfo: {
+              name: 'Korean Stock Analyzer MCP',
+              version: '1.1.1'
+            }
+          }
+        });
+      }
+      
+      // ping 메서드 (헬스체크)
+      if (method === 'ping') {
+        return res.status(200).json({
+          jsonrpc: '2.0',
+          id: id || 1,
+          result: {}
+        });
+      }
+      
       // 도구 목록 요청
       if (method === 'tools/list') {
         return res.status(200).json({
