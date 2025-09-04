@@ -7,15 +7,28 @@
 <a name="english"></a>
 ## 🇺🇸 English
 
-A Model Context Protocol (MCP) server that provides comprehensive Korean stock market analysis using strategies from 6 legendary investors.
+A comprehensive Korean stock market analysis tool using strategies from 6 legendary investors.
+
+### 🎯 Two Ways to Use
+
+1. **Local MCP Server** (Claude Desktop)
+   - Real-time KOSPI/KOSDAQ data via pykrx
+   - Python-based accurate Korean market data
+   
+2. **HTTP API Endpoint** (Kakao PlayMCP, Web Services)
+   - Vercel serverless deployment
+   - Real-time data via Yahoo Finance API
+   - Available directly in KakaoTalk
 
 ### Features
 
-- 📊 **Real-time Korean stock data** - Direct access to KOSPI/KOSDAQ data via pykrx
-- 🎯 **6 Investment Strategies** - Analysis based on proven methodologies
-- 📈 **7 Powerful Tools** - Complete toolkit for stock analysis
-- 🚀 **Zero Configuration** - Works out of the box
-- 🇰🇷 **Korean Market Focused** - Optimized for Korean equity analysis
+- 📊 **Real-time Stock & Financial Analysis** - PER, PBR, ROE, EPS
+- 📈 **Technical Indicators** - RSI, MACD, Bollinger Bands, Moving Averages
+- 💰 **DCF Valuation** - Fair value calculation
+- 📰 **News & Sentiment Analysis** - Latest news monitoring
+- 🏢 **Institutional/Foreign Flow** - Smart money tracking
+- 🔍 **Peer Comparison** - Industry competitor analysis
+- 🎯 **6 Investment Master Strategies** - Proven investment methodologies
 
 ### Quick Start
 
@@ -83,15 +96,28 @@ Add to `claude_desktop_config.json`:
 <a name="korean"></a>
 ## 🇰🇷 한국어
 
-6명의 전설적인 투자자들의 전략을 활용한 한국 주식 시장 종합 분석 MCP 서버입니다.
+한국 주식 시장 전문 분석 도구입니다. 워런 버핏, 피터 린치 등 6명의 전설적인 투자자들의 전략을 활용합니다.
+
+### 🎯 두 가지 사용 방식
+
+1. **로컬 MCP 서버** (Claude Desktop)
+   - pykrx를 통한 실시간 KOSPI/KOSDAQ 데이터
+   - Python 기반 정확한 한국 시장 데이터
+   
+2. **HTTP API 엔드포인트** (Kakao PlayMCP, 웹 서비스)
+   - Vercel 서버리스 배포
+   - Yahoo Finance API를 통한 실시간 데이터
+   - 카카오톡에서 바로 사용 가능
 
 ### 주요 기능
 
-- 📊 **실시간 한국 주식 데이터** - pykrx를 통한 KOSPI/KOSDAQ 직접 접근
-- 🎯 **6가지 투자 전략** - 검증된 투자 방법론 기반 분석
-- 📈 **7개의 강력한 도구** - 주식 분석을 위한 완벽한 툴킷
-- 🚀 **설정 불필요** - 즉시 사용 가능
-- 🇰🇷 **한국 시장 특화** - 한국 주식 분석에 최적화
+- 📊 **실시간 주가 및 재무제표 분석** - PER, PBR, ROE, EPS
+- 📈 **기술적 지표 계산** - RSI, MACD, 볼린저밴드, 이동평균선
+- 💰 **DCF 밸류에이션** - 적정주가 계산
+- 📰 **뉴스 및 감성 분석** - 최신 뉴스 모니터링
+- 🏢 **외국인/기관 수급 동향** - 스마트머니 추적
+- 🔍 **동종업계 비교 분석** - 경쟁사 대비 평가
+- 🎯 **6명의 투자 대가 전략** - 검증된 투자 방법론
 
 ### 설치 방법
 

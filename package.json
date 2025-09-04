@@ -1,7 +1,7 @@
 {
   "name": "@mrbaeksang/korea-stock-analyzer-mcp",
   "version": "1.1.1",
-  "description": "Korean stock analyzer with 6 investment legends' strategies for Claude Desktop (MCP)",
+  "description": "Korean stock analyzer with 6 investment legends' strategies. Works as both MCP server (Claude Desktop) and HTTP API (Kakao PlayMCP)",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
