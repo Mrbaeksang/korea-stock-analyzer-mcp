@@ -10,11 +10,11 @@
     "moduleResolution": "node16",
     "resolveJsonModule": true,
     "allowJs": true,
-    "noEmit": false,
+    "noEmit": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
-    "outDir": "./api",
-    "rootDir": "./api"
+    "outDir": "./dist",
+    "rootDir": "./"
   },
   "include": ["api/**/*"],
   "exclude": ["node_modules", "dist"]
