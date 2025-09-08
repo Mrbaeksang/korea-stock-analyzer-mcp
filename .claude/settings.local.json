@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(cmd /c dir:*)"
     ],
     "deny": [],
     "ask": []

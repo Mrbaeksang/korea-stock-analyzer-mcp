@@ -229,11 +229,21 @@ class KoreanStockAnalysisMCP {
     const { ticker, company_name, report_type = 'quick' } = args;
 
     try {
-      // 기본 데이터 수집
-      const [marketData, financialData] = await Promise.all([
+      // 타임아웃 설정과 함께 데이터 수집
+      const dataPromise = Promise.all([
         MarketDataService.fetchBasic(ticker),
         FinancialDataService.fetch(ticker),
       ]);
+      
+      // 30초 타임아웃 설정 (pykrx API가 느림)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('데이터 수집 타임아웃 (30초 초과)')), 30000)
+      );
+      
+      const [marketData, financialData] = await Promise.race([
+        dataPromise,
+        timeoutPromise
+      ]) as any;
       
       // 에러 체크
       if (marketData?.error) {

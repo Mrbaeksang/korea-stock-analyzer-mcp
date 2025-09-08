@@ -40,7 +40,7 @@ ${pythonCode}
         {
           encoding: 'utf8',
           maxBuffer: 1024 * 1024 * 50, // 50MB로 증가 (메모리 에러 방지)
-          timeout: 60000, // 60초 타임아웃 (pykrx API 느림)
+          timeout: 120000, // 120초 타임아웃으로 증가 (pykrx API 느림)
           windowsHide: true, // Windows에서 콘솔 창 숨기기
         }
       );
