@@ -3,10 +3,8 @@ import axios from 'axios';
 // Python API 엔드포인트 호출
 async function callPythonAPI(method: string, params: any): Promise<any> {
   try {
-    // Vercel 환경에서는 상대 경로, 로컬에서는 절대 경로
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : 'http://localhost:3000';
+    // 전체 URL 사용
+    const baseUrl = 'https://korea-stock-analyzer-mcp.vercel.app';
     
     const response = await axios.post(`${baseUrl}/api/stock_data`, {
       method,
