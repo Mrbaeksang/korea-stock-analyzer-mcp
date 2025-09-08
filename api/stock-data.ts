@@ -199,55 +199,49 @@ export async function comparePeers(ticker: string, peerTickers?: string[]): Prom
   try {
     let peers = peerTickers;
     
-    // peer가 없으면 자동 탐지 (최대 3개로 제한)
+    // peer가 없으면 자동 탐지 (최대 1개로 제한 - 타임아웃 방지)
     if (!peers || peers.length === 0) {
       const peerData = await callPythonAPI('searchPeers', { ticker });
       if (peerData.error) {
         throw new Error(peerData.error);
       }
-      peers = peerData.peers.slice(0, 3).map((p: any) => p.ticker);
+      peers = peerData.peers.slice(0, 1).map((p: any) => p.ticker);
     }
     
-    // 본 종목 포함 모든 종목 데이터 수집 (병렬 처리)
-    const allTickers = [ticker, ...(peers || [])].slice(0, 4); // 최대 4개로 제한
+    // 본 종목 포함 최대 2개만 (타임아웃 방지)
+    const allTickers = [ticker, ...(peers || [])].slice(0, 2);
     
-    // 모든 데이터를 병렬로 가져오기
+    // 모든 데이터를 병렬로 가져오기 (간소화)
     const promises = allTickers.map(async (t) => {
       try {
-        const [marketData, financialData] = await Promise.all([
-          callPythonAPI('getMarketData', { ticker: t }),
-          callPythonAPI('getFinancialData', { ticker: t })
-        ]);
+        // 재무 데이터만 가져오기 (시간 단축)
+        const financialData = await callPythonAPI('getFinancialData', { ticker: t });
         
         return {
           ticker: t,
           name: t,
-          currentPrice: marketData.currentPrice || 0,
-          marketCap: marketData.marketCap || 0,
           per: financialData.per?.toFixed(2) || 'N/A',
           pbr: financialData.pbr?.toFixed(2) || 'N/A',
+          eps: financialData.eps || 'N/A',
           roe: financialData.pbr && financialData.per 
             ? ((financialData.pbr / financialData.per) * 100).toFixed(2) 
-            : 'N/A',
-          revenueGrowth: 'N/A'
+            : 'N/A'
         };
       } catch (e) {
         console.error(`Failed to fetch data for ${t}:`, e);
         return {
           ticker: t,
           name: t,
-          currentPrice: 0,
-          marketCap: 0,
           per: 'N/A',
           pbr: 'N/A',
-          roe: 'N/A',
-          revenueGrowth: 'N/A'
+          eps: 'N/A',
+          roe: 'N/A'
         };
       }
     });
     
     const results = await Promise.all(promises);
-    return results.filter(r => r.currentPrice > 0); // 유효한 데이터만 반환
+    return results; // 모든 결과 반환
   } catch (error) {
     console.error('comparePeers error:', error);
     return [];
