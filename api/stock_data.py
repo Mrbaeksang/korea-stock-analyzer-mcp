@@ -185,30 +185,69 @@ class handler(BaseHTTPRequestHandler):
             end_date = datetime.now()
             
             # 최근 거래일 찾기
-            for i in range(7):
+            for i in range(10):  # 더 많은 날짜 탐색
                 check_date = (end_date - timedelta(days=i))
                 end_str = check_date.strftime('%Y%m%d')
-                start_date = check_date - timedelta(days=20)
+                start_date = check_date - timedelta(days=30)  # 더 긴 기간
                 start_str = start_date.strftime('%Y%m%d')
                 
                 try:
-                    # 투자자별 거래 데이터
-                    investor = stock.get_market_trading_value_by_date(start_str, end_str, ticker, detail=True)
+                    # 투자자별 순매수 데이터 (detail=True 제거)
+                    investor = stock.get_market_trading_value_by_date(start_str, end_str, ticker)
                     
-                    if not investor.empty:
+                    if not investor.empty and len(investor) > 0:
                         # NaN 값을 0으로 처리
                         investor = investor.fillna(0)
                         
-                        # 최근 누적 수급
-                        foreign_net = investor['외국인합계'].sum() if '외국인합계' in investor.columns else 0
-                        institution_net = investor['기관합계'].sum() if '기관합계' in investor.columns else 0
-                        individual_net = investor['개인'].sum() if '개인' in investor.columns else 0
+                        # 실제 컬럼 확인 후 사용
+                        columns = investor.columns.tolist()
+                        
+                        # 기본 컬럼명 (detail=False일 때)
+                        foreign_net = 0
+                        institution_net = 0
+                        individual_net = 0
+                        
+                        # 가능한 컬럼명들 체크
+                        if '외국인' in columns:
+                            foreign_net = investor['외국인'].sum()
+                        elif '외국인순매수' in columns:
+                            foreign_net = investor['외국인순매수'].sum()
+                            
+                        if '기관' in columns:
+                            institution_net = investor['기관'].sum()
+                        elif '기관계' in columns:
+                            institution_net = investor['기관계'].sum()
+                        elif '기관순매수' in columns:
+                            institution_net = investor['기관순매수'].sum()
+                            
+                        if '개인' in columns:
+                            individual_net = investor['개인'].sum()
+                        elif '개인순매수' in columns:
+                            individual_net = investor['개인순매수'].sum()
                         
                         # 최근 5일 데이터
-                        recent_5d = investor.tail(5)
-                        foreign_5d = recent_5d['외국인합계'].sum() if '외국인합계' in recent_5d.columns else 0
-                        institution_5d = recent_5d['기관합계'].sum() if '기관합계' in recent_5d.columns else 0
-                        individual_5d = recent_5d['개인'].sum() if '개인' in recent_5d.columns else 0
+                        recent_5d = investor.tail(5) if len(investor) >= 5 else investor
+                        
+                        foreign_5d = 0
+                        institution_5d = 0
+                        individual_5d = 0
+                        
+                        if '외국인' in columns:
+                            foreign_5d = recent_5d['외국인'].sum()
+                        elif '외국인순매수' in columns:
+                            foreign_5d = recent_5d['외국인순매수'].sum()
+                            
+                        if '기관' in columns:
+                            institution_5d = recent_5d['기관'].sum()
+                        elif '기관계' in columns:
+                            institution_5d = recent_5d['기관계'].sum()
+                        elif '기관순매수' in columns:
+                            institution_5d = recent_5d['기관순매수'].sum()
+                            
+                        if '개인' in columns:
+                            individual_5d = recent_5d['개인'].sum()
+                        elif '개인순매수' in columns:
+                            individual_5d = recent_5d['개인순매수'].sum()
                         
                         return {
                             'recent': {
@@ -221,9 +260,12 @@ class handler(BaseHTTPRequestHandler):
                                 'institutionNet': int(institution_5d),
                                 'individualNet': int(individual_5d)
                             },
-                            'period': f'{start_str} ~ {end_str}'
+                            'period': f'{start_str} ~ {end_str}',
+                            'dataPoints': len(investor)
                         }
-                except:
+                except Exception as e:
+                    # 더 구체적인 에러 로깅
+                    print(f"Error for date {end_str}: {str(e)}")
                     continue
             
             # 데이터가 없는 경우 0으로 반환
