@@ -192,38 +192,34 @@ class handler(BaseHTTPRequestHandler):
                 start_str = start_date.strftime('%Y%m%d')
                 
                 try:
-                    # 투자자별 순매수대금 데이터 (정확한 함수명)
-                    investor = stock.get_market_net_purchases_of_equities_by_ticker(start_str, end_str, ticker)
+                    # 투자자별 순매수대금 데이터
+                    investor = stock.get_market_trading_value_by_date(start_str, end_str, ticker)
                     
                     if not investor.empty and len(investor) > 0:
                         # NaN 값을 0으로 처리
                         investor = investor.fillna(0)
                         
-                        # 실제 컬럼 확인 후 사용
+                        # 실제 컬럼 확인
                         columns = investor.columns.tolist()
                         
-                        # 기본 컬럼명 (detail=False일 때)
+                        # 기본값
                         foreign_net = 0
                         institution_net = 0
                         individual_net = 0
                         
-                        # 가능한 컬럼명들 체크
-                        if '외국인' in columns:
+                        # pykrx 컬럼명: 기관합계, 기타법인, 개인, 외국인합계, 전체
+                        if '외국인합계' in columns:
+                            foreign_net = investor['외국인합계'].sum()
+                        elif '외국인' in columns:
                             foreign_net = investor['외국인'].sum()
-                        elif '외국인순매수' in columns:
-                            foreign_net = investor['외국인순매수'].sum()
                             
-                        if '기관' in columns:
+                        if '기관합계' in columns:
+                            institution_net = investor['기관합계'].sum()
+                        elif '기관' in columns:
                             institution_net = investor['기관'].sum()
-                        elif '기관계' in columns:
-                            institution_net = investor['기관계'].sum()
-                        elif '기관순매수' in columns:
-                            institution_net = investor['기관순매수'].sum()
                             
                         if '개인' in columns:
                             individual_net = investor['개인'].sum()
-                        elif '개인순매수' in columns:
-                            individual_net = investor['개인순매수'].sum()
                         
                         # 최근 5일 데이터
                         recent_5d = investor.tail(5) if len(investor) >= 5 else investor
@@ -232,22 +228,18 @@ class handler(BaseHTTPRequestHandler):
                         institution_5d = 0
                         individual_5d = 0
                         
-                        if '외국인' in columns:
+                        if '외국인합계' in columns:
+                            foreign_5d = recent_5d['외국인합계'].sum()
+                        elif '외국인' in columns:
                             foreign_5d = recent_5d['외국인'].sum()
-                        elif '외국인순매수' in columns:
-                            foreign_5d = recent_5d['외국인순매수'].sum()
                             
-                        if '기관' in columns:
+                        if '기관합계' in columns:
+                            institution_5d = recent_5d['기관합계'].sum()
+                        elif '기관' in columns:
                             institution_5d = recent_5d['기관'].sum()
-                        elif '기관계' in columns:
-                            institution_5d = recent_5d['기관계'].sum()
-                        elif '기관순매수' in columns:
-                            institution_5d = recent_5d['기관순매수'].sum()
                             
                         if '개인' in columns:
                             individual_5d = recent_5d['개인'].sum()
-                        elif '개인순매수' in columns:
-                            individual_5d = recent_5d['개인순매수'].sum()
                         
                         return {
                             'recent': {
