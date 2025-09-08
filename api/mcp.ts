@@ -382,11 +382,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             }
             
             case 'get_financial_data': {
-              const data = await stockData.getFinancialData(args.ticker);
-              result = {
-                content: [{
-                  type: 'text',
-                  text: `📈 ${args.ticker} 재무 데이터
+              const { ticker, years = 1 } = args;
+              const data = await stockData.getFinancialData(ticker, years);
+              
+              let reportText = '';
+              
+              if (data.yearly && data.yearly.length > 0) {
+                // 년도별 데이터가 있는 경우
+                const reportLines = [
+                  `📈 ${ticker} 재무 데이터 (${years}년 추이)`,
+                  ''
+                ];
+                
+                data.yearly.forEach((yearData: any) => {
+                  reportLines.push(
+                    `**${yearData.year}년**`,
+                    `- PER: ${yearData.per?.toFixed(2) || 'N/A'}`,
+                    `- PBR: ${yearData.pbr?.toFixed(2) || 'N/A'}`,
+                    `- EPS: ${yearData.eps ? `${Math.round(yearData.eps).toLocaleString()}원` : 'N/A'}`,
+                    `- BPS: ${yearData.bps ? `${Math.round(yearData.bps).toLocaleString()}원` : 'N/A'}`,
+                    `- 배당수익률: ${yearData.div?.toFixed(2) || 'N/A'}%`,
+                    ''
+                  );
+                });
+                
+                reportText = reportLines.join('\n');
+              } else {
+                // 단일 시점 데이터
+                reportText = `📈 ${ticker} 재무 데이터
 
 **주요 지표**
 - PER: ${data.per || 'N/A'}
@@ -394,7 +417,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 - EPS: ${data.eps || 'N/A'}원
 - BPS: ${data.bps || 'N/A'}원
 - ROE: ${data.roe || 'N/A'}%
-- 배당수익률: ${data.div || 'N/A'}%`
+- 배당수익률: ${data.div || 'N/A'}%`;
+              }
+              
+              result = {
+                content: [{
+                  type: 'text',
+                  text: reportText
                 }]
               };
               break;

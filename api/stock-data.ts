@@ -43,9 +43,9 @@ export async function getMarketData(ticker: string): Promise<any> {
 }
 
 // 재무 데이터 가져오기
-export async function getFinancialData(ticker: string): Promise<any> {
+export async function getFinancialData(ticker: string, years: number = 1): Promise<any> {
   try {
-    const data = await callPythonAPI('getFinancialData', { ticker });
+    const data = await callPythonAPI('getFinancialData', { ticker, years });
     
     if (data.error) {
       throw new Error(data.error);

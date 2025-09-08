@@ -25,7 +25,7 @@ class handler(BaseHTTPRequestHandler):
             if method == 'getMarketData':
                 result = self.get_market_data(params.get('ticker'))
             elif method == 'getFinancialData':
-                result = self.get_financial_data(params.get('ticker'))
+                result = self.get_financial_data(params.get('ticker'), params.get('years', 1))
             elif method == 'getTechnicalIndicators':
                 result = self.get_technical_indicators(params.get('ticker'))
             elif method == 'getSupplyDemand':
@@ -90,34 +90,65 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             return {'error': str(e), 'trace': traceback.format_exc()}
     
-    def get_financial_data(self, ticker):
-        """재무 데이터 조회"""
+    def get_financial_data(self, ticker, years=1):
+        """재무 데이터 조회 (년도별 추이 지원)"""
         try:
-            end_date = datetime.now()
+            import pandas as pd
             
-            # 최근 거래일 찾기 (주말/공휴일 대응)
-            for i in range(7):
-                check_date = (end_date - timedelta(days=i)).strftime('%Y%m%d')
-                try:
-                    fundamental = stock.get_market_fundamental_by_ticker(check_date, market="ALL")
-                    if not fundamental.empty and ticker in fundamental.index:
-                        fund = fundamental.loc[ticker]
-                        
-                        # NaN 체크 추가
-                        import pandas as pd
-                        return {
-                            'ticker': ticker,
-                            'per': float(fund['PER']) if pd.notna(fund['PER']) and fund['PER'] > 0 else None,
-                            'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) and fund['PBR'] > 0 else None,
-                            'eps': float(fund['EPS']) if pd.notna(fund['EPS']) and fund['EPS'] != 0 else None,
-                            'bps': float(fund['BPS']) if pd.notna(fund['BPS']) and fund['BPS'] != 0 else None,
-                            'div': float(fund['DIV']) if pd.notna(fund['DIV']) and fund['DIV'] >= 0 else None,
-                            'dps': float(fund['DPS']) if pd.notna(fund['DPS']) and fund['DPS'] >= 0 else None
-                        }
-                except:
-                    continue
+            if years == 1:
+                # 기존 로직: 최신 데이터만
+                end_date = datetime.now()
+                
+                # 최근 거래일 찾기 (주말/공휴일 대응)
+                for i in range(7):
+                    check_date = (end_date - timedelta(days=i)).strftime('%Y%m%d')
+                    try:
+                        fundamental = stock.get_market_fundamental_by_ticker(check_date, market="ALL")
+                        if not fundamental.empty and ticker in fundamental.index:
+                            fund = fundamental.loc[ticker]
+                            
+                            return {
+                                'ticker': ticker,
+                                'per': float(fund['PER']) if pd.notna(fund['PER']) and fund['PER'] > 0 else None,
+                                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) and fund['PBR'] > 0 else None,
+                                'eps': float(fund['EPS']) if pd.notna(fund['EPS']) and fund['EPS'] != 0 else None,
+                                'bps': float(fund['BPS']) if pd.notna(fund['BPS']) and fund['BPS'] != 0 else None,
+                                'div': float(fund['DIV']) if pd.notna(fund['DIV']) and fund['DIV'] >= 0 else None,
+                                'dps': float(fund['DPS']) if pd.notna(fund['DPS']) and fund['DPS'] >= 0 else None
+                            }
+                    except:
+                        continue
+            else:
+                # 여러 년도 데이터
+                result = {'ticker': ticker, 'yearly': []}
+                end_date = datetime.now()
+                
+                for year_offset in range(years):
+                    year = end_date.year - year_offset
+                    # 각 년도 12월 31일 기준 (또는 가장 가까운 거래일)
+                    year_end = f"{year}1231"
+                    year_start = f"{year}1220"
+                    
+                    try:
+                        fundamental = stock.get_market_fundamental_by_date(year_start, year_end, ticker)
+                        if not fundamental.empty:
+                            # 마지막 거래일 데이터
+                            fund = fundamental.iloc[-1]
+                            
+                            result['yearly'].append({
+                                'year': year,
+                                'per': float(fund['PER']) if pd.notna(fund['PER']) and fund['PER'] > 0 else None,
+                                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) and fund['PBR'] > 0 else None,
+                                'eps': float(fund['EPS']) if pd.notna(fund['EPS']) and fund['EPS'] != 0 else None,
+                                'bps': float(fund['BPS']) if pd.notna(fund['BPS']) and fund['BPS'] != 0 else None,
+                                'div': float(fund['DIV']) if pd.notna(fund['DIV']) and fund['DIV'] >= 0 else None
+                            })
+                    except:
+                        continue
+                
+                return result
             
-            return {'error': f'No fundamental data for {ticker} in last 7 days'}
+            return {'error': f'No fundamental data for {ticker}'}
             
         except Exception as e:
             return {'error': str(e), 'trace': traceback.format_exc()}
