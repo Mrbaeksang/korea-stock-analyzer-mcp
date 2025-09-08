@@ -93,25 +93,31 @@ class handler(BaseHTTPRequestHandler):
     def get_financial_data(self, ticker):
         """재무 데이터 조회"""
         try:
-            end_date = datetime.now().strftime('%Y%m%d')
+            end_date = datetime.now()
             
-            # 펀더멘털 데이터
-            fundamental = stock.get_market_fundamental_by_ticker(end_date, market="ALL")
+            # 최근 거래일 찾기 (주말/공휴일 대응)
+            for i in range(7):
+                check_date = (end_date - timedelta(days=i)).strftime('%Y%m%d')
+                try:
+                    fundamental = stock.get_market_fundamental_by_ticker(check_date, market="ALL")
+                    if not fundamental.empty and ticker in fundamental.index:
+                        fund = fundamental.loc[ticker]
+                        
+                        # NaN 체크 추가
+                        import pandas as pd
+                        return {
+                            'ticker': ticker,
+                            'per': float(fund['PER']) if pd.notna(fund['PER']) and fund['PER'] > 0 else None,
+                            'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) and fund['PBR'] > 0 else None,
+                            'eps': float(fund['EPS']) if pd.notna(fund['EPS']) and fund['EPS'] != 0 else None,
+                            'bps': float(fund['BPS']) if pd.notna(fund['BPS']) and fund['BPS'] != 0 else None,
+                            'div': float(fund['DIV']) if pd.notna(fund['DIV']) and fund['DIV'] >= 0 else None,
+                            'dps': float(fund['DPS']) if pd.notna(fund['DPS']) and fund['DPS'] >= 0 else None
+                        }
+                except:
+                    continue
             
-            if ticker not in fundamental.index:
-                return {'error': f'No fundamental data for {ticker}'}
-            
-            fund = fundamental.loc[ticker]
-            
-            return {
-                'ticker': ticker,
-                'per': float(fund['PER']) if fund['PER'] > 0 else None,
-                'pbr': float(fund['PBR']) if fund['PBR'] > 0 else None,
-                'eps': float(fund['EPS']) if fund['EPS'] > 0 else None,
-                'bps': float(fund['BPS']) if fund['BPS'] > 0 else None,
-                'div': float(fund['DIV']) if fund['DIV'] > 0 else None,
-                'dps': float(fund['DPS']) if fund['DPS'] > 0 else None
-            }
+            return {'error': f'No fundamental data for {ticker} in last 7 days'}
             
         except Exception as e:
             return {'error': str(e), 'trace': traceback.format_exc()}
@@ -177,40 +183,62 @@ class handler(BaseHTTPRequestHandler):
         """수급 데이터 조회"""
         try:
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=20)
             
-            end_str = end_date.strftime('%Y%m%d')
-            start_str = start_date.strftime('%Y%m%d')
+            # 최근 거래일 찾기
+            for i in range(7):
+                check_date = (end_date - timedelta(days=i))
+                end_str = check_date.strftime('%Y%m%d')
+                start_date = check_date - timedelta(days=20)
+                start_str = start_date.strftime('%Y%m%d')
+                
+                try:
+                    # 투자자별 거래 데이터
+                    investor = stock.get_market_trading_value_by_date(start_str, end_str, ticker, detail=True)
+                    
+                    if not investor.empty:
+                        # NaN 값을 0으로 처리
+                        investor = investor.fillna(0)
+                        
+                        # 최근 누적 수급
+                        foreign_net = investor['외국인합계'].sum() if '외국인합계' in investor.columns else 0
+                        institution_net = investor['기관합계'].sum() if '기관합계' in investor.columns else 0
+                        individual_net = investor['개인'].sum() if '개인' in investor.columns else 0
+                        
+                        # 최근 5일 데이터
+                        recent_5d = investor.tail(5)
+                        foreign_5d = recent_5d['외국인합계'].sum() if '외국인합계' in recent_5d.columns else 0
+                        institution_5d = recent_5d['기관합계'].sum() if '기관합계' in recent_5d.columns else 0
+                        individual_5d = recent_5d['개인'].sum() if '개인' in recent_5d.columns else 0
+                        
+                        return {
+                            'recent': {
+                                'foreignNet': int(foreign_net),
+                                'institutionNet': int(institution_net),
+                                'individualNet': int(individual_net)
+                            },
+                            'fiveDays': {
+                                'foreignNet': int(foreign_5d),
+                                'institutionNet': int(institution_5d),
+                                'individualNet': int(individual_5d)
+                            },
+                            'period': f'{start_str} ~ {end_str}'
+                        }
+                except:
+                    continue
             
-            # 투자자별 거래 데이터
-            investor = stock.get_market_trading_value_by_date(start_str, end_str, ticker, detail=True)
-            
-            if investor.empty:
-                return {'error': 'No investor data available'}
-            
-            # 최근 누적 수급
-            foreign_net = investor['외국인합계'].sum()
-            institution_net = investor['기관합계'].sum()
-            individual_net = investor['개인'].sum()
-            
-            # 최근 5일 데이터
-            recent_5d = investor.tail(5)
-            foreign_5d = recent_5d['외국인합계'].sum()
-            institution_5d = recent_5d['기관합계'].sum()
-            individual_5d = recent_5d['개인'].sum()
-            
+            # 데이터가 없는 경우 0으로 반환
             return {
                 'recent': {
-                    'foreignNet': int(foreign_net),
-                    'institutionNet': int(institution_net),
-                    'individualNet': int(individual_net)
+                    'foreignNet': 0,
+                    'institutionNet': 0,
+                    'individualNet': 0
                 },
                 'fiveDays': {
-                    'foreignNet': int(foreign_5d),
-                    'institutionNet': int(institution_5d),
-                    'individualNet': int(individual_5d)
+                    'foreignNet': 0,
+                    'institutionNet': 0,
+                    'individualNet': 0
                 },
-                'period': f'{start_str} ~ {end_str}'
+                'period': 'No data available'
             }
             
         except Exception as e:
