@@ -51,6 +51,12 @@ export async function getFinancialData(ticker: string, years: number = 1): Promi
       throw new Error(data.error);
     }
     
+    // yearly 데이터가 있으면 그대로 반환
+    if (data.yearly && data.yearly.length > 0) {
+      return data;
+    }
+    
+    // 단일 데이터인 경우 기존 형식으로 변환
     return {
       ticker,
       currentPrice: 0, // 시장 데이터에서 가져와야 함
