@@ -124,10 +124,16 @@ class handler(BaseHTTPRequestHandler):
                 end_date = datetime.now()
                 
                 for year_offset in range(years):
-                    year = end_date.year - year_offset
-                    # 각 년도 12월 31일 기준 (또는 가장 가까운 거래일)
-                    year_end = f"{year}1231"
-                    year_start = f"{year}1220"
+                    if year_offset == 0:
+                        # 현재 년도는 최신 데이터 사용
+                        year = end_date.year
+                        year_end = end_date.strftime('%Y%m%d')
+                        year_start = (end_date - timedelta(days=10)).strftime('%Y%m%d')
+                    else:
+                        # 과거 년도는 12월 말 기준
+                        year = end_date.year - year_offset
+                        year_end = f"{year}1231"
+                        year_start = f"{year}1220"
                     
                     try:
                         fundamental = stock.get_market_fundamental_by_date(year_start, year_end, ticker)
@@ -143,7 +149,8 @@ class handler(BaseHTTPRequestHandler):
                                 'bps': float(fund['BPS']) if pd.notna(fund['BPS']) and fund['BPS'] != 0 else None,
                                 'div': float(fund['DIV']) if pd.notna(fund['DIV']) and fund['DIV'] >= 0 else None
                             })
-                    except:
+                    except Exception as e:
+                        print(f"Error for year {year}: {str(e)}")
                         continue
                 
                 return result
