@@ -197,19 +197,24 @@ export async function getSupplyDemand(ticker: string, days?: number): Promise<an
 // 동종업계 비교
 export async function comparePeers(ticker: string, peerTickers?: string[]): Promise<any[]> {
   try {
-    let peers = peerTickers;
-    
-    // peer가 없으면 자동 탐지 (최대 1개로 제한 - 타임아웃 방지)
-    if (!peers || peers.length === 0) {
-      const peerData = await callPythonAPI('searchPeers', { ticker });
-      if (peerData.error) {
-        throw new Error(peerData.error);
-      }
-      peers = peerData.peers.slice(0, 1).map((p: any) => p.ticker);
+    // peer 탐지 건너뛰고 본 종목만 반환 (타임아웃 방지)
+    if (!peerTickers || peerTickers.length === 0) {
+      // 본 종목 데이터만 빠르게 반환
+      const financialData = await callPythonAPI('getFinancialData', { ticker });
+      return [{
+        ticker,
+        name: ticker,
+        per: financialData.per?.toFixed(2) || 'N/A',
+        pbr: financialData.pbr?.toFixed(2) || 'N/A',
+        eps: financialData.eps || 'N/A',
+        roe: financialData.pbr && financialData.per 
+          ? ((financialData.pbr / financialData.per) * 100).toFixed(2) 
+          : 'N/A'
+      }];
     }
     
-    // 본 종목 포함 최대 2개만 (타임아웃 방지)
-    const allTickers = [ticker, ...(peers || [])].slice(0, 2);
+    // peer가 제공된 경우만 비교
+    const allTickers = [ticker, ...peerTickers].slice(0, 2);
     
     // 모든 데이터를 병렬로 가져오기 (간소화)
     const promises = allTickers.map(async (t) => {
