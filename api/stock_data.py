@@ -192,8 +192,8 @@ class handler(BaseHTTPRequestHandler):
                 start_str = start_date.strftime('%Y%m%d')
                 
                 try:
-                    # 투자자별 순매수금액 데이터
-                    investor = stock.get_market_trading_value_by_investor(start_str, end_str, ticker)
+                    # 투자자별 순매수대금 데이터 (정확한 함수명)
+                    investor = stock.get_market_net_purchases_of_equities_by_ticker(start_str, end_str, ticker)
                     
                     if not investor.empty and len(investor) > 0:
                         # NaN 값을 0으로 처리
