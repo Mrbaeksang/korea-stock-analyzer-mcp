@@ -385,6 +385,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
               const { ticker, years = 1 } = args;
               const data = await stockData.getFinancialData(ticker, years);
               
+              console.log('Financial data received:', JSON.stringify(data));
+              
               let reportText = '';
               
               if (data.yearly && data.yearly.length > 0) {
