@@ -220,7 +220,7 @@ export async function comparePeers(ticker: string, peerTickers?: string[]): Prom
     }
     
     // peer가 제공된 경우만 비교
-    const allTickers = [ticker, ...peerTickers].slice(0, 5); // 최대 5개까지
+    const allTickers = [ticker, ...peerTickers].slice(0, 2); // 최대 2개 (타임아웃 방지)
     
     // 모든 데이터를 병렬로 가져오기 (간소화)
     const promises = allTickers.map(async (t) => {
