@@ -25,6 +25,25 @@ async function callPythonAPI(method: string, params: any): Promise<any> {
   }
 }
 
+// 시장 데이터 가져오기
+export async function getMarketData(ticker: string): Promise<any> {
+  try {
+    const data = await callPythonAPI('getMarketData', { ticker });
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('getMarketData error:', error);
+    return {
+      ticker,
+      error: 'Failed to fetch market data'
+    };
+  }
+}
+
 // 재무 데이터 가져오기
 export async function getFinancialData(ticker: string): Promise<any> {
   try {
