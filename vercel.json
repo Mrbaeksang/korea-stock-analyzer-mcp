@@ -5,7 +5,6 @@
       "memory": 512
     },
     "api/stock_data.py": {
-      "runtime": "python@3.9",
       "maxDuration": 30,
       "memory": 1024
     }
