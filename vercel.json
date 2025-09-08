@@ -3,6 +3,11 @@
     "api/mcp.ts": {
       "maxDuration": 10,
       "memory": 512
+    },
+    "api/stock_data.py": {
+      "runtime": "python3.9",
+      "maxDuration": 30,
+      "memory": 1024
     }
   },
   "rewrites": [

@@ -1,611 +1,227 @@
 import axios from 'axios';
 
-// 타입 정의
-interface StockPrice {
-  ticker: string;
-  currentPrice: number;
-  change: number;
-  changePercent: number;
-}
-
-interface FinancialData {
-  ticker: string;
-  currentPrice: number;
-  per: string;
-  pbr: string;
-  eps: string;
-  roe: string;
-  debtRatio?: string;
-  revenueGrowth?: string;
-  operatingMargin?: string;
-}
-
-interface TechnicalIndicators {
-  RSI?: number;
-  MACD?: number;
-  Stochastic?: number;
-  BollingerBands?: string;
-  MA20?: number;
-  MA50?: number;
-  MA200?: number;
-  volume?: number;
-}
-
-interface DCFResult {
-  fairValue: number;
-  currentPrice: number;
-  upside: number;
-  recommendation: string;
-}
-
-interface NewsItem {
-  title: string;
-  date: string;
-  summary: string;
-  sentiment: string;
-}
-
-interface SupplyDemand {
-  foreign: number;
-  institution: number;
-  individual: number;
-}
-
-interface CompanyComparison {
-  name: string;
-  ticker: string;
-  currentPrice: number;
-  marketCap: number;
-  per: string;
-  pbr: string;
-  roe: string;
-  revenueGrowth?: string;
-}
-
-// 종목명 매핑
-const TICKER_NAMES: { [key: string]: string } = {
-  '005930': '삼성전자',
-  '000660': 'SK하이닉스',
-  '035420': 'NAVER',
-  '035720': '카카오',
-  '051910': 'LG화학',
-  '006400': '삼성SDI',
-  '068270': '셀트리온',
-  '005380': '현대차',
-  '005490': 'POSCO홀딩스',
-  '105560': 'KB금융'
-};
-
-// Yahoo Finance 티커 변환
-function toYahooTicker(ticker: string): string {
-  return `${ticker}.KS`;
-}
-
-// Naver Finance에서 데이터 가져오기 (CORS 우회를 위해 프록시 사용)
-async function getNaverFinanceData(ticker: string): Promise<any> {
+// Python API 엔드포인트 호출
+async function callPythonAPI(method: string, params: any): Promise<any> {
   try {
-    // Naver Finance API 엔드포인트 (공개 API)
-    const url = `https://polling.finance.naver.com/api/realtime/domestic/stock/${ticker}`;
-    const response = await axios.get(url, {
+    // Vercel 환경에서는 상대 경로, 로컬에서는 절대 경로
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000';
+    
+    const response = await axios.post(`${baseUrl}/api/stock_data`, {
+      method,
+      params
+    }, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
-        'Referer': 'https://finance.naver.com'
-      }
-    });
-    
-    if (response.data && response.data.datas && response.data.datas.length > 0) {
-      return response.data.datas[0];
-    }
-    return null;
-  } catch (error) {
-    console.error(`Error fetching Naver Finance data for ${ticker}:`, error);
-    return null;
-  }
-}
-
-// KRX에서 데이터 가져오기 (공개 데이터)
-async function getKRXData(ticker: string): Promise<any> {
-  try {
-    // KRX 정보데이터시스템 공개 API
-    const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    const url = `http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd`;
-    
-    const params = {
-      bld: 'dbms/MDC/STAT/standard/MDCSTAT01501',
-      isuCd: ticker,
-      trdDd: date
-    };
-    
-    const response = await axios.post(url, new URLSearchParams(params), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0'
-      }
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000 // 30초 타임아웃
     });
     
     return response.data;
-  } catch (error) {
-    console.error(`Error fetching KRX data for ${ticker}:`, error);
-    return null;
+  } catch (error: any) {
+    console.error(`Python API call failed for ${method}:`, error.message);
+    throw error;
   }
 }
 
-// 주가 조회 함수 - 실제 Yahoo Finance API 사용
-async function getStockPrice(ticker: string): Promise<StockPrice> {
+// 재무 데이터 가져오기
+export async function getFinancialData(ticker: string): Promise<any> {
   try {
-    const yahooTicker = toYahooTicker(ticker);
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}`;
+    const data = await callPythonAPI('getFinancialData', { ticker });
     
-    const response = await axios.get(url);
-    const data = response.data.chart.result[0];
-    const price = data.meta.regularMarketPrice;
-    const previousClose = data.meta.previousClose;
-    const change = price - previousClose;
-    const changePercent = (change / previousClose) * 100;
-    
-    return {
-      ticker,
-      currentPrice: Math.round(price),
-      change: Math.round(change),
-      changePercent: parseFloat(changePercent.toFixed(2))
-    };
-  } catch (error) {
-    console.error(`Error fetching price for ${ticker}:`, error);
-    throw new Error(`주가 데이터를 가져올 수 없습니다: ${ticker}`);
-  }
-}
-
-// 재무 데이터 - 여러 소스에서 실제 데이터 가져오기
-export async function getFinancialData(ticker: string): Promise<FinancialData> {
-  try {
-    // 1. 먼저 주가 데이터 가져오기
-    const priceData = await getStockPrice(ticker);
-    
-    // 2. Naver Finance 데이터 시도
-    const naverData = await getNaverFinanceData(ticker);
-    
-    if (naverData) {
-      // Naver Finance에서 데이터 추출
-      const per = naverData.per || naverData.nPer || 15.0;
-      const pbr = naverData.pbr || naverData.nPbr || 1.5;
-      const eps = naverData.eps || Math.round(priceData.currentPrice / per);
-      const marketCap = naverData.marketValue || naverData.nMarketValue || 0;
-      
-      return {
-        ticker,
-        currentPrice: priceData.currentPrice,
-        per: per.toFixed(2),
-        pbr: pbr.toFixed(2),
-        eps: eps.toString(),
-        roe: ((eps / priceData.currentPrice) * pbr * 100).toFixed(2), // ROE = EPS/주가 * PBR
-        debtRatio: '40.0', // Naver에서 제공하지 않음
-        revenueGrowth: '5.0', // Naver에서 제공하지 않음
-        operatingMargin: '10.0' // Naver에서 제공하지 않음
-      };
+    if (data.error) {
+      throw new Error(data.error);
     }
     
-    // 3. Yahoo Finance 시도
-    const yahooTicker = toYahooTicker(ticker);
-    const statsUrl = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${yahooTicker}?modules=defaultKeyStatistics,financialData,summaryDetail`;
-    const statsResponse = await axios.get(statsUrl);
-    
-    if (statsResponse.data?.quoteSummary?.result?.[0]) {
-      const stats = statsResponse.data.quoteSummary.result[0];
-      const summaryDetail = stats.summaryDetail || {};
-      const financialData = stats.financialData || {};
-      const defaultKeyStats = stats.defaultKeyStatistics || {};
-      
-      const per = summaryDetail.trailingPE?.raw || 15.0;
-      const pbr = defaultKeyStats.priceToBook?.raw || 1.5;
-      const eps = summaryDetail.epsTrailingTwelveMonths?.raw || Math.round(priceData.currentPrice / per);
-      const roe = financialData.returnOnEquity?.raw ? (financialData.returnOnEquity.raw * 100) : 10.0;
-      const debtRatio = financialData.debtToEquity?.raw || 40.0;
-      const revenueGrowth = financialData.revenueGrowth?.raw ? (financialData.revenueGrowth.raw * 100) : 5.0;
-      const operatingMargin = financialData.operatingMargins?.raw ? (financialData.operatingMargins.raw * 100) : 10.0;
-      
-      return {
-        ticker,
-        currentPrice: priceData.currentPrice,
-        per: per.toFixed(2),
-        pbr: pbr.toFixed(2),
-        eps: eps.toFixed(0),
-        roe: roe.toFixed(2),
-        debtRatio: debtRatio.toFixed(2),
-        revenueGrowth: revenueGrowth.toFixed(2),
-        operatingMargin: operatingMargin.toFixed(2)
-      };
-    }
-    
-    // 4. 모든 소스가 실패한 경우 계산값 제공
     return {
       ticker,
-      currentPrice: priceData.currentPrice,
-      per: '15.0',
-      pbr: '1.5',
-      eps: Math.round(priceData.currentPrice / 15).toString(),
-      roe: '10.0',
-      debtRatio: '40.0',
-      revenueGrowth: '5.0',
-      operatingMargin: '10.0'
+      currentPrice: 0, // 시장 데이터에서 가져와야 함
+      per: data.per?.toFixed(2) || 'N/A',
+      pbr: data.pbr?.toFixed(2) || 'N/A',
+      eps: data.eps?.toFixed(0) || 'N/A',
+      roe: data.pbr && data.per ? ((data.pbr / data.per) * 100).toFixed(2) : 'N/A',
+      bps: data.bps?.toFixed(0) || 'N/A',
+      div: data.div?.toFixed(2) || 'N/A'
     };
   } catch (error) {
-    console.error(`Error fetching financial data for ${ticker}:`, error);
-    // 최종 폴백
+    console.error('getFinancialData error:', error);
     return {
       ticker,
-      currentPrice: 50000,
-      per: '15.0',
-      pbr: '1.5',
-      eps: '3333',
-      roe: '10.0',
-      debtRatio: '40.0',
-      revenueGrowth: '5.0',
-      operatingMargin: '10.0'
+      error: 'Failed to fetch financial data'
     };
   }
 }
 
-// 기술적 지표 - 실제 계산
-export async function getTechnicalIndicators(ticker: string, indicators: string[]): Promise<TechnicalIndicators> {
+// 기술적 지표 가져오기
+export async function getTechnicalIndicators(ticker: string, indicators?: string[]): Promise<any> {
   try {
-    const yahooTicker = toYahooTicker(ticker);
+    const data = await callPythonAPI('getTechnicalIndicators', { ticker });
     
-    // 과거 데이터 가져오기 (기술적 지표 계산용)
-    const historyUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=3mo&interval=1d`;
-    const response = await axios.get(historyUrl);
-    const data = response.data.chart.result[0];
-    
-    const quotes = data.indicators.quote[0];
-    const closePrices = quotes.close.filter((p: any) => p !== null);
-    const volumes = quotes.volume.filter((v: any) => v !== null);
-    
-    const result: TechnicalIndicators = {};
-    
-    // RSI 계산 (14일 기준)
-    if (indicators.includes('RSI') && closePrices.length >= 14) {
-      const rsi = calculateRSI(closePrices, 14);
-      result.RSI = rsi;
+    if (data.error) {
+      throw new Error(data.error);
     }
     
-    // 이동평균선
-    if (closePrices.length >= 20) {
-      result.MA20 = closePrices.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20;
-    }
-    if (closePrices.length >= 50) {
-      result.MA50 = closePrices.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50;
-    }
-    
-    // 거래량
-    if (volumes.length > 0) {
-      result.volume = volumes[volumes.length - 1];
-    }
-    
-    // MACD (간단한 버전)
-    if (indicators.includes('MACD') && closePrices.length >= 26) {
-      const ema12 = calculateEMA(closePrices, 12);
-      const ema26 = calculateEMA(closePrices, 26);
-      result.MACD = ema12 - ema26;
-    }
-    
-    // Bollinger Bands
-    if (indicators.includes('BollingerBands') && closePrices.length >= 20) {
-      const ma20 = result.MA20 || closePrices.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20;
-      const currentPrice = closePrices[closePrices.length - 1];
-      if (currentPrice > ma20 * 1.02) {
-        result.BollingerBands = '상단 밴드 근처';
-      } else if (currentPrice < ma20 * 0.98) {
-        result.BollingerBands = '하단 밴드 근처';
-      } else {
-        result.BollingerBands = '중간 밴드 근처';
-      }
-    }
-    
-    return result;
+    return {
+      RSI: data.rsi14,
+      MACD: 0, // Python에서 계산 추가 필요
+      MA20: data.ma20,
+      MA50: data.ma60, // ma60을 ma50으로 사용
+      BollingerBands: `Upper: ${data.bollingerUpper}, Lower: ${data.bollingerLower}`,
+      Stochastic: 0 // Python에서 계산 추가 필요
+    };
   } catch (error) {
-    console.error(`Error calculating technical indicators for ${ticker}:`, error);
-    return {};
+    console.error('getTechnicalIndicators error:', error);
+    return {
+      ticker,
+      error: 'Failed to fetch technical indicators'
+    };
   }
 }
 
-// RSI 계산 함수
-function calculateRSI(prices: number[], period: number = 14): number {
-  if (prices.length < period + 1) return 50;
-  
-  let gains = 0;
-  let losses = 0;
-  
-  for (let i = prices.length - period; i < prices.length; i++) {
-    const change = prices[i] - prices[i - 1];
-    if (change > 0) {
-      gains += change;
-    } else {
-      losses -= change;
-    }
-  }
-  
-  const avgGain = gains / period;
-  const avgLoss = losses / period;
-  
-  if (avgLoss === 0) return 100;
-  
-  const rs = avgGain / avgLoss;
-  const rsi = 100 - (100 / (1 + rs));
-  
-  return Math.round(rsi);
-}
-
-// EMA 계산 함수
-function calculateEMA(prices: number[], period: number): number {
-  const k = 2 / (period + 1);
-  let ema = prices[0];
-  
-  for (let i = 1; i < prices.length; i++) {
-    ema = (prices[i] * k) + (ema * (1 - k));
-  }
-  
-  return ema;
-}
-
-// DCF 계산 - 실제 재무 데이터 기반
-export async function calculateDCF(
-  ticker: string, 
-  growthRate: number = 0.05, 
-  discountRate: number = 0.1
-): Promise<DCFResult> {
+// DCF 계산
+export async function calculateDCF(ticker: string, growthRate?: number, discountRate?: number): Promise<any> {
   try {
-    const priceData = await getStockPrice(ticker);
-    const currentPrice = priceData.currentPrice;
-    const financialData = await getFinancialData(ticker);
+    // 재무 데이터와 시장 데이터 가져오기
+    const [financialData, marketData] = await Promise.all([
+      callPythonAPI('getFinancialData', { ticker }),
+      callPythonAPI('getMarketData', { ticker })
+    ]);
     
-    // EPS 기반 FCF 추정 (한국 시장 평균 FCF/EPS 비율 적용)
-    const eps = parseFloat(financialData.eps) || 5000;
-    const sharesOutstanding = 600000000; // 한국 대형주 평균 발행주식수
-    const fcfPerShare = eps * 0.7; // FCF/EPS 비율 70%
-    const freeCashFlow = fcfPerShare * sharesOutstanding;
+    if (financialData.error || marketData.error) {
+      throw new Error('Failed to fetch data for DCF calculation');
+    }
     
-    // 5년간 FCF 예측 및 현재가치 계산
-    let pvCashFlows = 0;
-    let fcf = freeCashFlow;
+    const currentPrice = marketData.currentPrice;
+    const eps = financialData.eps || 0;
     
+    // DCF 계산 (간단한 버전)
+    const growth = (growthRate || 5) / 100;
+    const discount = (discountRate || 10) / 100;
+    
+    // 5년간 예상 EPS의 현재가치
+    let fairValue = 0;
     for (let i = 1; i <= 5; i++) {
-      fcf = fcf * (1 + growthRate);
-      pvCashFlows += fcf / Math.pow(1 + discountRate, i);
+      const futureEPS = eps * Math.pow(1 + growth, i);
+      const presentValue = futureEPS / Math.pow(1 + discount, i);
+      fairValue += presentValue;
     }
     
-    // 터미널 가치
-    const terminalGrowth = 0.02; // 영구성장률 2%
-    const terminalValue = (fcf * (1 + terminalGrowth)) / (discountRate - terminalGrowth);
-    const pvTerminalValue = terminalValue / Math.pow(1 + discountRate, 5);
+    // 터미널 가치 (간단한 영구성장모델)
+    const terminalGrowth = 0.03; // 3% 영구성장
+    const terminalValue = (eps * Math.pow(1 + growth, 5) * (1 + terminalGrowth)) / (discount - terminalGrowth);
+    const terminalPV = terminalValue / Math.pow(1 + discount, 5);
     
-    // 기업가치 및 주당 가치
-    const enterpriseValue = pvCashFlows + pvTerminalValue;
-    const fairValue = enterpriseValue / sharesOutstanding;
+    fairValue += terminalPV;
     
-    // 보수적 조정 (한국 시장 디스카운트 적용)
-    const adjustedFairValue = fairValue * 0.85;
-    const upside = ((adjustedFairValue - currentPrice) / currentPrice) * 100;
+    // PER 배수 적용 (보수적으로 15배)
+    fairValue = fairValue * 15;
+    
+    const upside = ((fairValue - currentPrice) / currentPrice) * 100;
     
     return {
-      fairValue: Math.round(adjustedFairValue),
+      fairValue: Math.round(fairValue),
       currentPrice,
-      upside: parseFloat(upside.toFixed(2)),
-      recommendation: upside > 30 ? '강력 매수' : upside > 10 ? '매수' : upside > -10 ? '보유' : '매도'
+      upside: upside.toFixed(1),
+      recommendation: upside > 20 ? '매수' : upside > 0 ? '보유' : '매도'
     };
   } catch (error) {
-    console.error(`Error calculating DCF for ${ticker}:`, error);
-    // 에러 시에도 간단한 계산 제공
-    try {
-      const priceData = await getStockPrice(ticker);
-      const currentPrice = priceData.currentPrice;
-      // PER 기반 간단한 적정가치 계산
-      const fairValue = currentPrice * 1.1; // 10% 프리미엄
-      
-      return {
-        fairValue: Math.round(fairValue),
-        currentPrice,
-        upside: 10.0,
-        recommendation: '보유'
-      };
-    } catch {
-      return {
-        fairValue: 60000,
-        currentPrice: 55000,
-        upside: 9.09,
-        recommendation: '보유'
-      };
-    }
+    console.error('calculateDCF error:', error);
+    return {
+      ticker,
+      error: 'Failed to calculate DCF'
+    };
   }
 }
 
-// 뉴스 검색 - 실제 뉴스
-export async function searchNews(ticker: string, days: number = 7): Promise<NewsItem[]> {
+// 뉴스 검색 (실제 구현 필요)
+export async function searchNews(ticker: string, days?: number): Promise<any[]> {
+  // 네이버 뉴스 API나 크롤링 구현 필요
+  // 임시로 빈 배열 반환
+  return [
+    {
+      title: `${ticker} 관련 최신 뉴스`,
+      date: new Date().toLocaleDateString('ko-KR'),
+      summary: '뉴스 API 연동이 필요합니다.',
+      sentiment: '중립'
+    }
+  ];
+}
+
+// 수급 데이터 가져오기
+export async function getSupplyDemand(ticker: string, days?: number): Promise<any> {
   try {
-    const companyName = TICKER_NAMES[ticker] || ticker;
-    const news: NewsItem[] = [];
+    const data = await callPythonAPI('getSupplyDemand', { ticker });
     
-    // Yahoo Finance 뉴스 API 시도
-    try {
-      const yahooTicker = toYahooTicker(ticker);
-      const newsUrl = `https://query1.finance.yahoo.com/v7/finance/news?symbols=${yahooTicker}`;
-      const response = await axios.get(newsUrl);
-      
-      if (response.data?.items) {
-        response.data.items.slice(0, 5).forEach((item: any) => {
-          news.push({
-            title: item.title || `${companyName} 관련 뉴스`,
-            date: new Date(item.published_at || Date.now()).toLocaleDateString(),
-            summary: item.summary || item.title || '요약 없음',
-            sentiment: analyzeSentiment(item.title)
-          });
-        });
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    
+    // 억원 단위로 변환
+    return {
+      foreign: Math.round(data.recent.foreignNet / 100000000),
+      institution: Math.round(data.recent.institutionNet / 100000000),
+      individual: Math.round(data.recent.individualNet / 100000000),
+      fiveDays: {
+        foreign: Math.round(data.fiveDays.foreignNet / 100000000),
+        institution: Math.round(data.fiveDays.institutionNet / 100000000),
+        individual: Math.round(data.fiveDays.individualNet / 100000000)
       }
-    } catch (error) {
-      console.log('Yahoo Finance 뉴스 가져오기 실패');
-    }
-    
-    // 뉴스가 없으면 최소한의 정보 제공
-    if (news.length === 0) {
-      const today = new Date();
-      news.push(
-        {
-          title: `${companyName} 주가 동향 분석`,
-          date: today.toLocaleDateString(),
-          summary: '최근 주가 변동 및 거래량 분석',
-          sentiment: '중립'
-        },
-        {
-          title: `${companyName} 실적 전망`,
-          date: new Date(today.getTime() - 86400000).toLocaleDateString(),
-          summary: '분기 실적 발표 예정 및 전망',
-          sentiment: '긍정'
-        },
-        {
-          title: `증권가 ${companyName} 목표가 조정`,
-          date: new Date(today.getTime() - 172800000).toLocaleDateString(),
-          summary: '주요 증권사 투자의견 및 목표가',
-          sentiment: '중립'
-        }
-      );
-    }
-    
-    return news;
+    };
   } catch (error) {
-    console.error(`Error fetching news for ${ticker}:`, error);
+    console.error('getSupplyDemand error:', error);
+    return {
+      ticker,
+      error: 'Failed to fetch supply/demand data'
+    };
+  }
+}
+
+// 동종업계 비교
+export async function comparePeers(ticker: string, peerTickers?: string[]): Promise<any[]> {
+  try {
+    let peers = peerTickers;
+    
+    // peer가 없으면 자동 탐지
+    if (!peers || peers.length === 0) {
+      const peerData = await callPythonAPI('searchPeers', { ticker });
+      if (peerData.error) {
+        throw new Error(peerData.error);
+      }
+      peers = peerData.peers.map((p: any) => p.ticker);
+    }
+    
+    // 본 종목 포함 모든 종목 데이터 수집
+    const allTickers = [ticker, ...(peers || [])];
+    const results = [];
+    
+    for (const t of allTickers) {
+      try {
+        const [marketData, financialData] = await Promise.all([
+          callPythonAPI('getMarketData', { ticker: t }),
+          callPythonAPI('getFinancialData', { ticker: t })
+        ]);
+        
+        results.push({
+          ticker: t,
+          name: t, // 종목명은 별도로 가져와야 함
+          currentPrice: marketData.currentPrice,
+          marketCap: marketData.marketCap,
+          per: financialData.per?.toFixed(2) || 'N/A',
+          pbr: financialData.pbr?.toFixed(2) || 'N/A',
+          roe: financialData.pbr && financialData.per 
+            ? ((financialData.pbr / financialData.per) * 100).toFixed(2) 
+            : 'N/A',
+          revenueGrowth: 'N/A' // 별도 계산 필요
+        });
+      } catch (e) {
+        console.error(`Failed to fetch data for ${t}:`, e);
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('comparePeers error:', error);
     return [];
   }
-}
-
-// 감성 분석 헬퍼 함수
-function analyzeSentiment(text: string): string {
-  const positiveWords = ['상승', '증가', '호재', '신고가', '상향', '개선', '성장'];
-  const negativeWords = ['하락', '감소', '악재', '신저가', '하향', '악화', '부진'];
-  
-  let score = 0;
-  positiveWords.forEach(word => {
-    if (text.includes(word)) score++;
-  });
-  negativeWords.forEach(word => {
-    if (text.includes(word)) score--;
-  });
-  
-  if (score > 0) return '긍정';
-  if (score < 0) return '부정';
-  return '중립';
-}
-
-// 수급 동향 - 실제 거래량 기반 추정
-export async function getSupplyDemand(ticker: string, _days: number = 10): Promise<SupplyDemand> {
-  try {
-    // Yahoo Finance에서 거래량 데이터 가져와서 수급 추정
-    const yahooTicker = toYahooTicker(ticker);
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=1mo&interval=1d`;
-    
-    const response = await axios.get(url);
-    const data = response.data.chart.result[0];
-    const volumes = data.indicators.quote[0].volume.filter((v: any) => v !== null);
-    
-    // 최근 거래량 추세로 수급 추정
-    const recentVolume = volumes.slice(-5).reduce((a: number, b: number) => a + b, 0) / 5;
-    const avgVolume = volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length;
-    const volumeRatio = recentVolume / avgVolume;
-    
-    // 거래량 증가시 기관/외국인 순매수 추정
-    let foreign = 0;
-    let institution = 0;
-    let individual = 0;
-    
-    if (volumeRatio > 1.2) {
-      // 거래량 증가
-      foreign = Math.round((volumeRatio - 1) * 10000);
-      institution = Math.round((volumeRatio - 1) * 5000);
-      individual = -(foreign + institution);
-    } else if (volumeRatio < 0.8) {
-      // 거래량 감소
-      foreign = -Math.round((1 - volumeRatio) * 5000);
-      institution = -Math.round((1 - volumeRatio) * 3000);
-      individual = -(foreign + institution);
-    } else {
-      // 보합
-      foreign = Math.round((Math.random() - 0.5) * 2000);
-      institution = Math.round((Math.random() - 0.5) * 1500);
-      individual = -(foreign + institution);
-    }
-    
-    return {
-      foreign,
-      institution,
-      individual
-    };
-  } catch (error) {
-    console.error(`Error fetching supply/demand for ${ticker}:`, error);
-    // 에러시 임의 데이터
-    return {
-      foreign: 1500,
-      institution: -800,
-      individual: -700
-    };
-  }
-}
-
-// 동종업계 비교 - 실제 데이터
-export async function comparePeers(ticker: string, peerTickers: string[]): Promise<CompanyComparison[]> {
-  // 기본 비교 종목 설정 (섹터별)
-  const defaultPeers: { [key: string]: string[] } = {
-    '005930': ['000660', '005935'], // 삼성전자 -> SK하이닉스, 삼성전자우
-    '000660': ['005930', '005935'], // SK하이닉스 -> 삼성전자, 삼성전자우
-    '035420': ['035720', '003550'], // NAVER -> 카카오, LG
-    '035720': ['035420', '003550'], // 카카오 -> NAVER, LG
-    '051910': ['006400', '003670'], // LG화학 -> 삼성SDI, 포스코케미칼
-    '006400': ['051910', '003670'], // 삼성SDI -> LG화학, 포스코케미칼
-  };
-  
-  const tickers = [ticker, ...(peerTickers || defaultPeers[ticker] || ['005930', '000660'])];
-  const results: CompanyComparison[] = [];
-  
-  // 병렬로 데이터 가져오기
-  const promises = tickers.map(async (t) => {
-    try {
-      const financialData = await getFinancialData(t);
-      
-      // 시가총액 계산 (주가 * 추정 발행주식수)
-      const estimatedShares = {
-        '005930': 5969782550, // 삼성전자
-        '000660': 728002365, // SK하이닉스
-        '035420': 164813395, // NAVER
-        '035720': 534428931, // 카카오
-        '051910': 70592343, // LG화학
-        '006400': 68764530 // 삼성SDI
-      };
-      
-      const shares = estimatedShares[t as keyof typeof estimatedShares] || 100000000;
-      const marketCap = Math.round(financialData.currentPrice * shares / 100000000); // 억원 단위
-      
-      return {
-        name: TICKER_NAMES[t] || t,
-        ticker: t,
-        currentPrice: financialData.currentPrice,
-        marketCap,
-        per: financialData.per,
-        pbr: financialData.pbr,
-        roe: financialData.roe,
-        revenueGrowth: financialData.revenueGrowth
-      };
-    } catch (error) {
-      console.error(`Error fetching peer data for ${t}:`, error);
-      // 에러 발생시에도 기본 데이터 제공
-      return {
-        name: TICKER_NAMES[t] || t,
-        ticker: t,
-        currentPrice: 50000,
-        marketCap: 1000000,
-        per: '15.0',
-        pbr: '1.5',
-        roe: '10.0',
-        revenueGrowth: '5.0'
-      };
-    }
-  });
-  
-  const peerResults = await Promise.all(promises);
-  return peerResults.filter(result => result !== null);
 }
