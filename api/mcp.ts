@@ -466,13 +466,14 @@ ${news.slice(0, args.limit || 5).map((item: any, i: number) =>
                   text: `📊 ${args.ticker} 수급 동향 (최근 ${args.days || 20}일)
 
 **순매수 금액**
-- 외국인: ${data.foreign || 'N/A'}억원
-- 기관: ${data.institution || 'N/A'}억원
-- 개인: ${data.individual || 'N/A'}억원
+- 외국인: ${data.foreign !== undefined ? data.foreign : 'N/A'}억원
+- 기관: ${data.institution !== undefined ? data.institution : 'N/A'}억원
+- 개인: ${data.individual !== undefined ? data.individual : 'N/A'}억원
 
 **5일 수급**
-- 외국인: ${data.fiveDays?.foreign || 'N/A'}억원
-- 기관: ${data.fiveDays?.institution || 'N/A'}억원`
+- 외국인: ${data.fiveDays?.foreign !== undefined ? data.fiveDays.foreign : 'N/A'}억원
+- 기관: ${data.fiveDays?.institution !== undefined ? data.fiveDays.institution : 'N/A'}억원
+- 개인: ${data.fiveDays?.individual !== undefined ? data.fiveDays.individual : 'N/A'}억원`
                 }]
               };
               break;
