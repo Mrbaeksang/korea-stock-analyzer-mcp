@@ -77,7 +77,7 @@ export async function getFinancialData(ticker: string, years: number = 1): Promi
 }
 
 // 기술적 지표 가져오기
-export async function getTechnicalIndicators(ticker: string, indicators?: string[]): Promise<any> {
+export async function getTechnicalIndicators(ticker: string): Promise<any> {
   try {
     const data = await callPythonAPI('getTechnicalIndicators', { ticker });
     
@@ -172,7 +172,7 @@ export async function searchNews(ticker: string, days?: number): Promise<any[]> 
 }
 
 // 수급 데이터 가져오기
-export async function getSupplyDemand(ticker: string, days?: number): Promise<any> {
+export async function getSupplyDemand(ticker: string): Promise<any> {
   try {
     const data = await callPythonAPI('getSupplyDemand', { ticker });
     

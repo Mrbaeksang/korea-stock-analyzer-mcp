@@ -143,10 +143,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                       type: 'string',
                       description: '종목 코드 (예: 005930)'
                     },
-                    company_name: {
-                      type: 'string',
-                      description: '회사명 (예: 삼성전자)'
-                    },
                     report_type: {
                       type: 'string',
                       enum: ['quick', 'summary', 'full'],
@@ -223,11 +219,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                     ticker: {
                       type: 'string',
                       description: '종목 코드'
-                    },
-                    days: {
-                      type: 'number',
-                      description: '조회 기간 (미사용, 항상 30일)',
-                      default: 30
                     }
                   },
                   required: ['ticker']
@@ -267,7 +258,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         try {
           switch (name) {
             case 'analyze_equity': {
-              const { ticker, company_name, report_type = 'quick' } = args;
+              const { ticker, report_type = 'quick' } = args;
               
               // 기본 데이터 수집
               const [financialData, marketData] = await Promise.all([
@@ -289,7 +280,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                 const upside = currentPrice > 0 ? ((fairValue - currentPrice) / currentPrice) * 100 : 0;
                 
                 const report = [
-                  `# 📊 ${company_name || ticker} 실시간 분석`,
+                  `# 📊 ${ticker} 실시간 분석`,
                   '',
                   '## 주요 지표',
                   `- 현재가: ₩${currentPrice?.toLocaleString()}`,
