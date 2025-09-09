@@ -107,13 +107,17 @@ class handler(BaseHTTPRequestHandler):
                         if not fundamental.empty and ticker in fundamental.index:
                             fund = fundamental.loc[ticker]
                             
-                            # PER이 0이면 적자 기업이므로 None 또는 음수 처리
+                            # PER과 EPS 값 가져오기
                             per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
                             eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
                             
-                            # PER이 0이면 적자를 의미하므로 -999로 표시 (또는 None)
-                            if per_value == 0:
-                                per_value = -999  # 적자를 명확히 표시
+                            # PER이 0이고 EPS가 음수면 실제 음수 PER 계산
+                            if per_value == 0 and eps_value and eps_value < 0:
+                                # 현재가 가져오기
+                                ohlcv = stock.get_market_ohlcv_by_date(check_date, check_date, ticker)
+                                if not ohlcv.empty:
+                                    current_price = float(ohlcv.iloc[0]['종가'])
+                                    per_value = current_price / eps_value  # 음수 PER
                             
                             return {
                                 'ticker': ticker,
@@ -152,9 +156,13 @@ class handler(BaseHTTPRequestHandler):
                             per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
                             eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
                             
-                            # PER이 0이면 적자를 의미
-                            if per_value == 0:
-                                per_value = -999
+                            # PER이 0이고 EPS가 음수면 실제 음수 PER 계산
+                            if per_value == 0 and eps_value and eps_value < 0:
+                                # 현재가 가져오기 (yearly 데이터는 해당 년도 말 기준)
+                                year_ohlcv = stock.get_market_ohlcv_by_date(year_end, year_end, ticker)
+                                if not year_ohlcv.empty:
+                                    year_price = float(year_ohlcv.iloc[0]['종가'])
+                                    per_value = year_price / eps_value  # 음수 PER
                             
                             result['yearly'].append({
                                 'year': year,

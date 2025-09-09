@@ -476,7 +476,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                 // 동종업계 자동 탐지 로직 추가
                 if (!args.peer_tickers || args.peer_tickers.length === 0) {
                   // Python API 호출
-                  const peersData = await fetch('https://korea-stock-analyzer-mcp.vercel.app/api/stock_data', {
+                  const peersData: any = await fetch('https://korea-stock-analyzer-mcp.vercel.app/api/stock_data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
