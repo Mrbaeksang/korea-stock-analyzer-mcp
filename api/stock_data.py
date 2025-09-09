@@ -111,8 +111,44 @@ class handler(BaseHTTPRequestHandler):
                             per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
                             eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
                             
+                            # EPS가 0이고 PER도 0인 경우 - 데이터 문제 또는 적자
+                            # BPS가 있으면 데이터는 있는 것이므로 적자로 판단
+                            if eps_value == 0 and per_value == 0:
+                                bps_value = float(fund['BPS']) if pd.notna(fund['BPS']) else 0
+                                if bps_value > 0:
+                                    # BPS가 있으면 실제 적자 상황
+                                    # 이전 분기 EPS 데이터 찾기 시도
+                                    try:
+                                        # 최근 180일 데이터에서 EPS가 0이 아닌 마지막 값 찾기
+                                        start_date = (datetime.strptime(check_date, '%Y%m%d') - timedelta(days=180)).strftime('%Y%m%d')
+                                        hist_fund = stock.get_market_fundamental_by_date(start_date, check_date, ticker)
+                                        hist_fund = hist_fund[hist_fund['EPS'] != 0]
+                                        if not hist_fund.empty:
+                                            last_eps = float(hist_fund.iloc[-1]['EPS'])
+                                            if last_eps < 0:
+                                                # 이전에도 적자였음
+                                                eps_value = last_eps
+                                                ohlcv = stock.get_market_ohlcv_by_date(check_date, check_date, ticker)
+                                                if not ohlcv.empty:
+                                                    current_price = float(ohlcv.iloc[0]['종가'])
+                                                    per_value = current_price / eps_value
+                                            else:
+                                                # 이전엔 흑자였는데 지금 적자 전환
+                                                per_value = None  # 적자 전환 시 PER 계산 불가
+                                                eps_value = None
+                                        else:
+                                            # 과거 데이터도 없음
+                                            eps_value = None
+                                            per_value = None
+                                    except:
+                                        eps_value = None
+                                        per_value = None
+                                else:
+                                    # BPS도 0이면 데이터 자체가 없음
+                                    eps_value = None
+                                    per_value = None
                             # PER이 0이고 EPS가 음수면 실제 음수 PER 계산
-                            if per_value == 0 and eps_value and eps_value < 0:
+                            elif per_value == 0 and eps_value and eps_value < 0:
                                 # 현재가 가져오기
                                 ohlcv = stock.get_market_ohlcv_by_date(check_date, check_date, ticker)
                                 if not ohlcv.empty:
@@ -156,8 +192,27 @@ class handler(BaseHTTPRequestHandler):
                             per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
                             eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
                             
-                            # PER이 0이고 EPS가 음수면 실제 음수 PER 계산
-                            if per_value == 0 and eps_value and eps_value < 0:
+                            # EPS가 0이면 이전 데이터 사용 시도 (데이터 문제 해결)
+                            if eps_value == 0 and per_value == 0:
+                                bps_value = float(fund['BPS']) if pd.notna(fund['BPS']) else 0
+                                if bps_value > 0:
+                                    # BPS가 있으면 데이터는 있지만 EPS가 0인 상황
+                                    # 이전 유효한 EPS 찾기
+                                    try:
+                                        start_search = f"{year}0101"
+                                        hist = stock.get_market_fundamental_by_date(start_search, year_end, ticker)
+                                        hist = hist[hist['EPS'] != 0]
+                                        if not hist.empty:
+                                            eps_value = float(hist.iloc[-1]['EPS'])
+                                            if eps_value < 0:
+                                                year_ohlcv = stock.get_market_ohlcv_by_date(year_end, year_end, ticker)
+                                                if not year_ohlcv.empty:
+                                                    year_price = float(year_ohlcv.iloc[0]['종가'])
+                                                    per_value = year_price / eps_value
+                                    except:
+                                        pass
+                            # PER이 0이고 EPS가 음수면 실제 음수 PER 계산  
+                            elif per_value == 0 and eps_value and eps_value < 0:
                                 # 현재가 가져오기 (yearly 데이터는 해당 년도 말 기준)
                                 year_ohlcv = stock.get_market_ohlcv_by_date(year_end, year_end, ticker)
                                 if not year_ohlcv.empty:
