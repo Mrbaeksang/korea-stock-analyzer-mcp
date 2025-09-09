@@ -314,7 +314,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                 ]);
                 
                 const sections = [
-                  `# 📊 ${company_name || ticker} 투자 분석 보고서`,
+                  `# 📊 ${ticker} 투자 분석 보고서`,
                   '',
                   '## 1. 기업 개요',
                   `- 종목코드: ${ticker}`,
@@ -442,11 +442,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             }
             
             case 'get_supply_demand': {
-              const data = await stockData.getSupplyDemand(args.ticker, args.days);
+              const data = await stockData.getSupplyDemand(args.ticker);
               result = {
                 content: [{
                   type: 'text',
-                  text: `📊 ${args.ticker} 수급 동향 (최근 ${args.days || 20}일)
+                  text: `📊 ${args.ticker} 수급 동향
 
 **순매수 금액**
 - 외국인: ${data.foreign !== undefined ? data.foreign : 'N/A'}억원
