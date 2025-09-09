@@ -395,75 +395,128 @@ class handler(BaseHTTPRequestHandler):
             return {'error': str(e), 'trace': traceback.format_exc()}
     
     def search_peers(self, ticker):
-        """동종업계 종목 찾기"""
+        """동종업계 종목 찾기 (업종 기반)"""
         try:
-            # 어제 날짜 사용 (오늘 데이터는 아직 없음)
+            # 어제 날짜 사용
             end_date = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
             
-            # 시가총액 데이터
-            market_cap = stock.get_market_cap_by_ticker(end_date)
-            
-            if ticker not in market_cap.index:
-                return {'error': f'Ticker {ticker} not found'}
-            
-            target_cap = market_cap.loc[ticker, '시가총액']
-            
-            # 시가총액이 0인 경우 현재가 × 상장주식수로 계산
-            if target_cap == 0:
-                try:
-                    ohlcv = stock.get_market_ohlcv_by_date(end_date, end_date, ticker)
-                    if not ohlcv.empty:
-                        current_price = ohlcv.iloc[0]['종가']
-                        shares = market_cap.loc[ticker, '상장주식수'] if '상장주식수' in market_cap.columns else 0
-                        if shares > 0:
-                            target_cap = current_price * shares
-                except:
-                    pass
-            
-            # 여전히 0이면 에러 반환
-            if target_cap == 0:
-                return {
-                    'mainTicker': ticker,
-                    'error': 'Market cap is 0',
-                    'peers': [],
-                    'message': '시가총액 데이터를 가져올 수 없습니다.'
-                }
-            
-            # 시가총액 유사 종목 찾기
-            if target_cap > 10000000000000:  # 10조원 이상
-                min_ratio, max_ratio = 0.1, 10.0
-            elif target_cap > 1000000000000:  # 1조원 이상
-                min_ratio, max_ratio = 0.3, 3.0
-            else:
-                min_ratio, max_ratio = 0.5, 2.0
-            
-            similar_caps = market_cap[
-                (market_cap['시가총액'] >= target_cap * min_ratio) & 
-                (market_cap['시가총액'] <= target_cap * max_ratio) &
-                (market_cap.index != ticker)
-            ].sort_values('시가총액', ascending=False)
-            
-            # 상위 5개 종목
-            peer_tickers = similar_caps.index[:5].tolist()
-            
-            # 종목명 가져오기
-            peers = []
-            for peer_ticker in peer_tickers:
-                try:
-                    name = stock.get_market_ticker_name(peer_ticker)
+            # 업종 정보와 시가총액 가져오기 (KOSPI 먼저 시도, 없으면 KOSDAQ)
+            try:
+                sector_data = stock.get_market_sector_classifications(end_date, market="KOSPI")
+                if ticker not in sector_data.index:
+                    # KOSDAQ 시도
+                    sector_data = stock.get_market_sector_classifications(end_date, market="KOSDAQ")
+                    if ticker not in sector_data.index:
+                        return {'error': f'Ticker {ticker} not found'}
+            except Exception as e:
+                # 에러 시 시가총액 기반으로 fallback
+                print(f"Sector classification failed: {e}, using market cap method")
+                market_cap = stock.get_market_cap_by_ticker(end_date)
+                if ticker not in market_cap.index:
+                    return {'error': f'Ticker {ticker} not found'}
+                
+                target_cap = market_cap.loc[ticker, '시가총액']
+                target_name = stock.get_market_ticker_name(ticker)
+                
+                # 시가총액 유사 종목
+                if target_cap > 10000000000000:
+                    min_ratio, max_ratio = 0.1, 10.0
+                elif target_cap > 1000000000000:
+                    min_ratio, max_ratio = 0.3, 3.0
+                else:
+                    min_ratio, max_ratio = 0.5, 2.0
+                
+                similar = market_cap[
+                    (market_cap['시가총액'] >= target_cap * min_ratio) & 
+                    (market_cap['시가총액'] <= target_cap * max_ratio) &
+                    (market_cap.index != ticker)
+                ].sort_values('시가총액', ascending=False).head(5)
+                
+                peers = []
+                for peer_ticker in similar.index:
                     peers.append({
                         'ticker': peer_ticker,
-                        'name': name,
-                        'marketCap': int(similar_caps.loc[peer_ticker, '시가총액'])
+                        'name': stock.get_market_ticker_name(peer_ticker),
+                        'marketCap': int(similar.loc[peer_ticker, '시가총액'])
                     })
-                except:
-                    continue
+                
+                return {
+                    'mainTicker': ticker,
+                    'mainName': target_name,
+                    'mainMarketCap': int(target_cap),
+                    'peers': peers,
+                    'method': 'market_cap_similarity'
+                }
+            
+            # 대상 종목 정보
+            target_info = sector_data.loc[ticker]
+            target_sector = target_info['업종명']
+            target_cap = target_info['시가총액']
+            target_name = target_info['종목명']
+            
+            # 같은 업종 종목들 찾기
+            same_sector = sector_data[
+                (sector_data['업종명'] == target_sector) & 
+                (sector_data.index != ticker)
+            ]
+            
+            # 시가총액 기준 정렬
+            if len(same_sector) > 0:
+                # 시가총액 차이 계산
+                same_sector['cap_diff'] = abs(same_sector['시가총액'] - target_cap)
+                same_sector = same_sector.sort_values('cap_diff')
+                
+                # 상위 5개 선택
+                peer_tickers = same_sector.index[:5].tolist()
+                
+                peers = []
+                for peer_ticker in peer_tickers:
+                    try:
+                        peer_info = same_sector.loc[peer_ticker]
+                        peers.append({
+                            'ticker': peer_ticker,
+                            'name': peer_info['종목명'],
+                            'marketCap': int(peer_info['시가총액'])
+                        })
+                    except:
+                        continue
+            else:
+                # 같은 업종이 없으면 시가총액 유사 종목으로 대체
+                if target_cap > 10000000000000:  # 10조원 이상
+                    min_ratio, max_ratio = 0.1, 10.0
+                elif target_cap > 1000000000000:  # 1조원 이상
+                    min_ratio, max_ratio = 0.3, 3.0
+                else:
+                    min_ratio, max_ratio = 0.5, 2.0
+                
+                similar_caps = sector_data[
+                    (sector_data['시가총액'] >= target_cap * min_ratio) & 
+                    (sector_data['시가총액'] <= target_cap * max_ratio) &
+                    (sector_data.index != ticker)
+                ].sort_values('시가총액', ascending=False)
+                
+                peer_tickers = similar_caps.index[:5].tolist()
+                
+                peers = []
+                for peer_ticker in peer_tickers:
+                    try:
+                        peer_info = similar_caps.loc[peer_ticker]
+                        peers.append({
+                            'ticker': peer_ticker,
+                            'name': peer_info['종목명'],
+                            'marketCap': int(peer_info['시가총액']),
+                            'sector': peer_info['업종명']  # 다른 업종임을 표시
+                        })
+                    except:
+                        continue
             
             return {
                 'mainTicker': ticker,
+                'mainName': target_name,
+                'mainSector': target_sector,
                 'mainMarketCap': int(target_cap),
                 'peers': peers,
-                'method': 'market_cap_similarity'
+                'method': 'sector_based' if len(same_sector) > 0 else 'market_cap_similarity'
             }
             
         except Exception as e:

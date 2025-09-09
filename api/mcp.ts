@@ -135,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             tools: [
               {
                 name: 'analyze_equity',
-                description: '한국 주식 종목 종합 분석 (빠른 분석 / 요약 / 전체 보고서)',
+                description: '한국 주식 종목 종합 분석 (재무/기술/수급 데이터 통합)',
                 inputSchema: {
                   type: 'object',
                   properties: {
@@ -154,12 +154,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                       default: 'quick'
                     }
                   },
-                  required: ['ticker', 'company_name']
+                  required: ['ticker']
                 }
               },
               {
                 name: 'get_financial_data',
-                description: '재무제표 데이터 조회 (PER, PBR, EPS, BPS, 배당수익률)',
+                description: '재무 데이터 조회 (PER, PBR, EPS, BPS, DIV, DPS, 연도별 지원)',
                 inputSchema: {
                   type: 'object',
                   properties: {
@@ -169,8 +169,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                     },
                     years: {
                       type: 'number',
-                      description: '조회 기간 (년)',
-                      default: 3
+                      description: '조회 연도 수 (1=최신, 2+=연도별)',
+                      default: 1
                     }
                   },
                   required: ['ticker']
@@ -178,7 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
               },
               {
                 name: 'get_technical_indicators',
-                description: '기술적 지표 분석 (이동평균, RSI, MACD, 볼린저밴드)',
+                description: '기술적 지표 계산 (MA5/20/60, RSI14, 볼린저밴드, 변동성)',
                 inputSchema: {
                   type: 'object',
                   properties: {
@@ -192,7 +192,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
               },
               {
                 name: 'calculate_dcf',
-                description: 'DCF(현금흐름할인) 모델로 적정가치 계산',
+                description: 'DCF 모델 기반 적정주가 계산 (5년 예측 + 터미널 가치)',
                 inputSchema: {
                   type: 'object',
                   properties: {
@@ -203,7 +203,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                     growth_rate: {
                       type: 'number',
                       description: '예상 성장률 (%)',
-                      default: 10
+                      default: 5
                     },
                     discount_rate: {
                       type: 'number',
@@ -216,7 +216,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
               },
               {
                 name: 'get_supply_demand',
-                description: '수급 데이터 조회 (외국인, 기관, 개인)',
+                description: '투자자별 순매수 데이터 (외국인/기관/개인, 30일 고정)',
                 inputSchema: {
                   type: 'object',
                   properties: {
@@ -226,8 +226,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                     },
                     days: {
                       type: 'number',
-                      description: '조회 기간 (일)',
-                      default: 20
+                      description: '조회 기간 (미사용, 항상 30일)',
+                      default: 30
                     }
                   },
                   required: ['ticker']
@@ -235,7 +235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
               },
               {
                 name: 'compare_peers',
-                description: '동종업계 비교 분석 (자동으로 유사 종목 탐지)',
+                description: '동종업계 비교 분석 (업종 기반 자동 탐지, 시가총액 fallback)',
                 inputSchema: {
                   type: 'object',
                   properties: {
