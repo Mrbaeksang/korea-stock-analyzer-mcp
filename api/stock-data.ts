@@ -203,56 +203,84 @@ export async function getSupplyDemand(ticker: string, days?: number): Promise<an
 // 동종업계 비교
 export async function comparePeers(ticker: string, peerTickers?: string[]): Promise<any[]> {
   try {
-    // peer 탐지 건너뛰고 본 종목만 반환 (타임아웃 방지)
-    if (!peerTickers || peerTickers.length === 0) {
-      // 본 종목 데이터만 빠르게 반환
-      const financialData = await callPythonAPI('getFinancialData', { ticker });
-      return [{
-        ticker,
-        name: ticker,
-        per: financialData.per?.toFixed(2) || 'N/A',
-        pbr: financialData.pbr?.toFixed(2) || 'N/A',
-        eps: financialData.eps || 'N/A',
-        roe: financialData.pbr && financialData.per 
-          ? ((financialData.pbr / financialData.per) * 100).toFixed(2) 
-          : 'N/A'
-      }];
+    // 본 종목 데이터는 항상 가져오기
+    const [financialData, marketData] = await Promise.all([
+      callPythonAPI('getFinancialData', { ticker }),
+      callPythonAPI('getMarketData', { ticker })
+    ]);
+    
+    // 종목명 가져오기 시도
+    let tickerName = ticker;
+    try {
+      // searchPeers API를 통해 종목명 획득 시도
+      const searchResult = await callPythonAPI('searchPeers', { ticker });
+      if (searchResult.mainName) {
+        tickerName = searchResult.mainName;
+      }
+    } catch (e) {
+      // 실패해도 계속 진행
     }
     
-    // peer가 제공된 경우만 비교
-    const allTickers = [ticker, ...peerTickers].slice(0, 2); // 최대 2개 (타임아웃 방지)
+    const mainCompany = {
+      ticker,
+      name: tickerName,
+      currentPrice: marketData.currentPrice || 0,
+      marketCap: marketData.marketCap || 0,
+      per: financialData.per?.toFixed(2) || 'N/A',
+      pbr: financialData.pbr?.toFixed(2) || 'N/A',
+      eps: financialData.eps || 'N/A',
+      roe: financialData.pbr && financialData.per 
+        ? ((financialData.pbr / financialData.per) * 100).toFixed(2) 
+        : 'N/A'
+    };
     
-    // 모든 데이터를 병렬로 가져오기 (간소화)
-    const promises = allTickers.map(async (t) => {
+    // peer가 없으면 본 종목만 반환
+    if (!peerTickers || peerTickers.length === 0) {
+      return [mainCompany];
+    }
+    
+    // peer 종목들 데이터 수집 (본 종목 제외)
+    const peerPromises = peerTickers.slice(0, 4).map(async (peerTicker) => {
       try {
-        // 재무 데이터만 가져오기 (시간 단축)
-        const financialData = await callPythonAPI('getFinancialData', { ticker: t });
+        const [peerFinancial, peerMarket] = await Promise.all([
+          callPythonAPI('getFinancialData', { ticker: peerTicker }),
+          callPythonAPI('getMarketData', { ticker: peerTicker })
+        ]);
+        
+        // peer 종목명 가져오기
+        let peerName = peerTicker;
+        try {
+          const peerSearch = await callPythonAPI('searchPeers', { ticker: peerTicker });
+          if (peerSearch.mainName) {
+            peerName = peerSearch.mainName;
+          }
+        } catch (e) {
+          // 실패해도 계속
+        }
         
         return {
-          ticker: t,
-          name: t,
-          per: financialData.per?.toFixed(2) || 'N/A',
-          pbr: financialData.pbr?.toFixed(2) || 'N/A',
-          eps: financialData.eps || 'N/A',
-          roe: financialData.pbr && financialData.per 
-            ? ((financialData.pbr / financialData.per) * 100).toFixed(2) 
+          ticker: peerTicker,
+          name: peerName,
+          currentPrice: peerMarket.currentPrice || 0,
+          marketCap: peerMarket.marketCap || 0,
+          per: peerFinancial.per?.toFixed(2) || 'N/A',
+          pbr: peerFinancial.pbr?.toFixed(2) || 'N/A',
+          eps: peerFinancial.eps || 'N/A',
+          roe: peerFinancial.pbr && peerFinancial.per 
+            ? ((peerFinancial.pbr / peerFinancial.per) * 100).toFixed(2) 
             : 'N/A'
         };
       } catch (e) {
-        console.error(`Failed to fetch data for ${t}:`, e);
-        return {
-          ticker: t,
-          name: t,
-          per: 'N/A',
-          pbr: 'N/A',
-          eps: 'N/A',
-          roe: 'N/A'
-        };
+        console.error(`Failed to fetch data for ${peerTicker}:`, e);
+        return null;
       }
     });
     
-    const results = await Promise.all(promises);
-    return results; // 모든 결과 반환
+    const peerResults = await Promise.all(peerPromises);
+    const validPeers = peerResults.filter(p => p !== null);
+    
+    // 본 종목 + peer 종목들 반환
+    return [mainCompany, ...validPeers];
   } catch (error) {
     console.error('comparePeers error:', error);
     return [];

@@ -215,29 +215,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                 }
               },
               {
-                name: 'search_news',
-                description: '종목 관련 최신 뉴스 검색',
-                inputSchema: {
-                  type: 'object',
-                  properties: {
-                    ticker: {
-                      type: 'string',
-                      description: '종목 코드'
-                    },
-                    company_name: {
-                      type: 'string',
-                      description: '회사명'
-                    },
-                    limit: {
-                      type: 'number',
-                      description: '뉴스 개수',
-                      default: 5
-                    }
-                  },
-                  required: ['company_name']
-                }
-              },
-              {
                 name: 'get_supply_demand',
                 description: '수급 데이터 조회 (외국인, 기관, 개인)',
                 inputSchema: {
@@ -473,22 +450,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
               break;
             }
             
-            case 'search_news': {
-              const news = await stockData.searchNews(args.ticker, args.limit);
-              result = {
-                content: [{
-                  type: 'text',
-                  text: `📰 ${args.company_name || args.ticker} 관련 뉴스
-
-${news.slice(0, args.limit || 5).map((item: any, i: number) => 
-`**${i + 1}. ${item.title}**
-- 일시: ${item.date}
-- 요약: ${item.summary}`).join('\n\n')}`
-                }]
-              };
-              break;
-            }
-            
             case 'get_supply_demand': {
               const data = await stockData.getSupplyDemand(args.ticker, args.days);
               result = {
@@ -511,12 +472,75 @@ ${news.slice(0, args.limit || 5).map((item: any, i: number) =>
             }
             
             case 'compare_peers': {
-              const data = await stockData.comparePeers(args.ticker, args.peer_tickers);
-              
-              result = {
-                content: [{
-                  type: 'text',
-                  text: `🔍 동종업계 비교 분석
+              try {
+                // 동종업계 자동 탐지 로직 추가
+                if (!args.peer_tickers || args.peer_tickers.length === 0) {
+                  // Python API 호출
+                  const peersData = await fetch('https://korea-stock-analyzer-mcp.vercel.app/api/stock_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      method: 'searchPeers',
+                      params: { ticker: args.ticker }
+                    })
+                  }).then(r => r.json());
+                  
+                  if (peersData.peers && peersData.peers.length > 0) {
+                    // 동종업계 찾음
+                    const peerTickers = peersData.peers.map((p: any) => p.ticker).slice(0, 4);
+                    const data = await stockData.comparePeers(args.ticker, peerTickers);
+                    
+                    // 첫 번째 회사의 이름 사용 (메인 종목)
+                    const mainCompanyName = data[0]?.name || args.ticker;
+                    
+                    result = {
+                      content: [{
+                        type: 'text',
+                        text: `🔍 ${mainCompanyName} 동종업계 비교 분석
+
+**시가총액 유사 기업들과 비교**
+${data.map((company: any) => `
+**${company.name || company.ticker}**
+- 현재가: ${company.currentPrice?.toLocaleString() || 'N/A'}원
+- 시가총액: ${company.marketCap ? `${(company.marketCap / 100000000).toFixed(1)}억` : 'N/A'}
+- PER: ${company.per || 'N/A'}
+- PBR: ${company.pbr || 'N/A'}
+- ROE: ${company.roe || 'N/A'}%`).join('\n')}
+
+📊 분석: 시가총액 기준 유사 기업들과 비교했습니다.`
+                      }]
+                    };
+                  } else {
+                    // 동종업계를 찾지 못한 경우 본 종목만 표시
+                    const mainData = await stockData.comparePeers(args.ticker, []);
+                    const mainCompanyName = mainData[0]?.name || args.ticker;
+                    
+                    result = {
+                      content: [{
+                        type: 'text',
+                        text: `🔍 ${mainCompanyName} 기업 정보
+
+${mainData.map((company: any) => `
+**${company.name || company.ticker}**
+- 현재가: ${company.currentPrice?.toLocaleString() || 'N/A'}원  
+- 시가총액: ${company.marketCap ? `${(company.marketCap / 100000000).toFixed(1)}억` : 'N/A'}
+- PER: ${company.per || 'N/A'}
+- PBR: ${company.pbr || 'N/A'}
+- ROE: ${company.roe || 'N/A'}%`).join('\n')}
+
+💡 시가총액 기준 유사 기업을 자동으로 찾지 못했습니다.
+관련 업종이나 비교하고 싶은 종목을 직접 지정해서 다시 시도해주세요.`
+                      }]
+                    };
+                  }
+                } else {
+                  // peer_tickers가 제공된 경우
+                  const data = await stockData.comparePeers(args.ticker, args.peer_tickers);
+                  
+                  result = {
+                    content: [{
+                      type: 'text',
+                      text: `🔍 동종업계 비교 분석
 
 ${data.map((company: any) => `
 **${company.name || company.ticker}**
@@ -525,8 +549,44 @@ ${data.map((company: any) => `
 - PER: ${company.per || 'N/A'}
 - PBR: ${company.pbr || 'N/A'}
 - ROE: ${company.roe || 'N/A'}%`).join('\n')}`
-                }]
-              };
+                    }]
+                  };
+                }
+              } catch (error: any) {
+                // 에러 발생시 본 종목만 표시
+                try {
+                  const mainData = await stockData.comparePeers(args.ticker, []);
+                  const mainCompanyName = mainData[0]?.name || args.ticker;
+                  
+                  result = {
+                    content: [{
+                      type: 'text',
+                      text: `🔍 ${mainCompanyName} 기업 정보
+
+${mainData.length > 0 ? mainData.map((company: any) => `
+**${company.name || company.ticker}**
+- 현재가: ${company.currentPrice?.toLocaleString() || 'N/A'}원
+- 시가총액: ${company.marketCap ? `${(company.marketCap / 100000000).toFixed(1)}억` : 'N/A'}
+- PER: ${company.per || 'N/A'}
+- PBR: ${company.pbr || 'N/A'}
+- ROE: ${company.roe || 'N/A'}%`).join('\n') : '데이터를 가져올 수 없습니다.'}
+
+💡 동종업계 탐색에 실패했습니다.`
+                    }]
+                  };
+                } catch (innerError) {
+                  // 모든 것이 실패한 경우
+                  result = {
+                    content: [{
+                      type: 'text',
+                      text: `종목 ${args.ticker}의 정보를 가져올 수 없습니다.
+
+종목 코드를 확인해주세요.
+예: 005930 (삼성전자), 000660 (SK하이닉스)`
+                    }]
+                  };
+                }
+              }
               break;
             }
             

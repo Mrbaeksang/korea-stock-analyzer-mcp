@@ -107,14 +107,22 @@ class handler(BaseHTTPRequestHandler):
                         if not fundamental.empty and ticker in fundamental.index:
                             fund = fundamental.loc[ticker]
                             
+                            # PER이 0이면 적자 기업이므로 None 또는 음수 처리
+                            per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
+                            eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
+                            
+                            # PER이 0이면 적자를 의미하므로 -999로 표시 (또는 None)
+                            if per_value == 0:
+                                per_value = -999  # 적자를 명확히 표시
+                            
                             return {
                                 'ticker': ticker,
-                                'per': float(fund['PER']) if pd.notna(fund['PER']) and fund['PER'] > 0 else None,
-                                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) and fund['PBR'] > 0 else None,
-                                'eps': float(fund['EPS']) if pd.notna(fund['EPS']) and fund['EPS'] != 0 else None,
-                                'bps': float(fund['BPS']) if pd.notna(fund['BPS']) and fund['BPS'] != 0 else None,
-                                'div': float(fund['DIV']) if pd.notna(fund['DIV']) and fund['DIV'] >= 0 else None,
-                                'dps': float(fund['DPS']) if pd.notna(fund['DPS']) and fund['DPS'] >= 0 else None
+                                'per': per_value,
+                                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) else None,
+                                'eps': eps_value,
+                                'bps': float(fund['BPS']) if pd.notna(fund['BPS']) else None,
+                                'div': float(fund['DIV']) if pd.notna(fund['DIV']) else 0.0,
+                                'dps': float(fund['DPS']) if pd.notna(fund['DPS']) else 0.0
                             }
                     except:
                         continue
@@ -141,13 +149,20 @@ class handler(BaseHTTPRequestHandler):
                             # 마지막 거래일 데이터
                             fund = fundamental.iloc[-1]
                             
+                            per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
+                            eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
+                            
+                            # PER이 0이면 적자를 의미
+                            if per_value == 0:
+                                per_value = -999
+                            
                             result['yearly'].append({
                                 'year': year,
-                                'per': float(fund['PER']) if pd.notna(fund['PER']) and fund['PER'] > 0 else None,
-                                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) and fund['PBR'] > 0 else None,
-                                'eps': float(fund['EPS']) if pd.notna(fund['EPS']) and fund['EPS'] != 0 else None,
-                                'bps': float(fund['BPS']) if pd.notna(fund['BPS']) and fund['BPS'] != 0 else None,
-                                'div': float(fund['DIV']) if pd.notna(fund['DIV']) and fund['DIV'] >= 0 else None
+                                'per': per_value,
+                                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) else None,
+                                'eps': eps_value,
+                                'bps': float(fund['BPS']) if pd.notna(fund['BPS']) else None,
+                                'div': float(fund['DIV']) if pd.notna(fund['DIV']) else 0.0
                             })
                     except Exception as e:
                         print(f"Error for year {year}: {str(e)}")
@@ -319,7 +334,8 @@ class handler(BaseHTTPRequestHandler):
     def search_peers(self, ticker):
         """동종업계 종목 찾기"""
         try:
-            end_date = datetime.now().strftime('%Y%m%d')
+            # 어제 날짜 사용 (오늘 데이터는 아직 없음)
+            end_date = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
             
             # 시가총액 데이터
             market_cap = stock.get_market_cap_by_ticker(end_date)
@@ -328,6 +344,27 @@ class handler(BaseHTTPRequestHandler):
                 return {'error': f'Ticker {ticker} not found'}
             
             target_cap = market_cap.loc[ticker, '시가총액']
+            
+            # 시가총액이 0인 경우 현재가 × 상장주식수로 계산
+            if target_cap == 0:
+                try:
+                    ohlcv = stock.get_market_ohlcv_by_date(end_date, end_date, ticker)
+                    if not ohlcv.empty:
+                        current_price = ohlcv.iloc[0]['종가']
+                        shares = market_cap.loc[ticker, '상장주식수'] if '상장주식수' in market_cap.columns else 0
+                        if shares > 0:
+                            target_cap = current_price * shares
+                except:
+                    pass
+            
+            # 여전히 0이면 에러 반환
+            if target_cap == 0:
+                return {
+                    'mainTicker': ticker,
+                    'error': 'Market cap is 0',
+                    'peers': [],
+                    'message': '시가총액 데이터를 가져올 수 없습니다.'
+                }
             
             # 시가총액 유사 종목 찾기
             if target_cap > 10000000000000:  # 10조원 이상
