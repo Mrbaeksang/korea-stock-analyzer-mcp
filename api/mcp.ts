@@ -134,6 +134,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           result: {
             tools: [
               {
+                name: 'search_ticker',
+                description: '종목명으로 종목코드를 검색합니다. 회사 이름의 일부만 입력해도 검색 가능합니다.',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    company_name: {
+                      type: 'string',
+                      description: '검색할 회사명 (예: "삼성전자", "KCC", "LG화학")'
+                    }
+                  },
+                  required: ['company_name']
+                }
+              },
+              {
                 name: 'analyze_equity',
                 description: '한국 주식 종목 종합 분석 (재무/기술/수급 데이터 통합)',
                 inputSchema: {
@@ -257,6 +271,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         
         try {
           switch (name) {
+            case 'search_ticker': {
+              const searchData = await fetch('https://korea-stock-analyzer-mcp.vercel.app/api/stock_data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  method: 'searchTicker',
+                  params: { company_name: args.company_name }
+                })
+              }).then(r => r.json());
+              
+              if (searchData.error) {
+                result = {
+                  content: [{
+                    type: 'text',
+                    text: `❌ 오류: ${searchData.error}`
+                  }]
+                };
+              } else if (searchData.count === 0) {
+                result = {
+                  content: [{
+                    type: 'text',
+                    text: `🔍 "${args.company_name}" 검색 결과가 없습니다.`
+                  }]
+                };
+              } else {
+                result = {
+                  content: [{
+                    type: 'text',
+                    text: `🔍 "${args.company_name}" 검색 결과 (${searchData.count}개)
+
+${searchData.results.map((r: any) => 
+`**${r.name}** (${r.ticker})
+- 시장: ${r.market}
+- 시가총액: ${(r.marketCap / 100000000).toFixed(1)}억원`
+).join('\n\n')}`
+                  }]
+                };
+              }
+              break;
+            }
+            
             case 'analyze_equity': {
               const { ticker, report_type = 'quick' } = args;
               

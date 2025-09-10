@@ -30,6 +30,8 @@ class handler(BaseHTTPRequestHandler):
                 result = self.get_technical_indicators(params.get('ticker'))
             elif method == 'getSupplyDemand':
                 result = self.get_supply_demand(params.get('ticker'))
+            elif method == 'searchTicker':
+                result = self.search_ticker(params.get('company_name'))
             elif method == 'searchPeers':
                 result = self.search_peers(params.get('ticker'))
             else:
@@ -389,6 +391,58 @@ class handler(BaseHTTPRequestHandler):
                     'individualNet': 0
                 },
                 'period': 'No data available'
+            }
+            
+        except Exception as e:
+            return {'error': str(e), 'trace': traceback.format_exc()}
+    
+    def search_ticker(self, company_name):
+        """종목명으로 종목코드 검색"""
+        try:
+            from datetime import datetime, timedelta
+            
+            # 어제 날짜
+            end_date = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
+            
+            # KOSPI와 KOSDAQ 모든 종목 가져오기
+            kospi_tickers = stock.get_market_ticker_list(end_date, market="KOSPI")
+            kosdaq_tickers = stock.get_market_ticker_list(end_date, market="KOSDAQ")
+            
+            results = []
+            
+            # KOSPI 검색
+            for ticker in kospi_tickers:
+                name = stock.get_market_ticker_name(ticker)
+                if company_name.lower() in name.lower():
+                    cap = stock.get_market_cap_by_ticker(end_date)
+                    if ticker in cap.index:
+                        results.append({
+                            'ticker': ticker,
+                            'name': name,
+                            'market': 'KOSPI',
+                            'marketCap': int(cap.loc[ticker, '시가총액'])
+                        })
+            
+            # KOSDAQ 검색
+            for ticker in kosdaq_tickers:
+                name = stock.get_market_ticker_name(ticker)
+                if company_name.lower() in name.lower():
+                    cap = stock.get_market_cap_by_ticker(end_date)
+                    if ticker in cap.index:
+                        results.append({
+                            'ticker': ticker,
+                            'name': name,
+                            'market': 'KOSDAQ',
+                            'marketCap': int(cap.loc[ticker, '시가총액'])
+                        })
+            
+            # 시가총액 순으로 정렬
+            results.sort(key=lambda x: x['marketCap'], reverse=True)
+            
+            return {
+                'query': company_name,
+                'count': len(results),
+                'results': results
             }
             
         except Exception as e:
