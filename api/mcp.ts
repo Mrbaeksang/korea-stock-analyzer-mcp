@@ -272,7 +272,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         try {
           switch (name) {
             case 'search_ticker': {
-              const searchData = await fetch('https://korea-stock-analyzer-mcp.vercel.app/api/stock_data', {
+              const searchData: any = await fetch('https://korea-stock-analyzer-mcp.vercel.app/api/stock_data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
