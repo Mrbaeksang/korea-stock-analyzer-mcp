@@ -510,10 +510,30 @@ class handler(BaseHTTPRequestHandler):
                     except:
                         continue
             
+            # peers가 비어있으면 무조건 채우기 (전체 시장에서 시가총액 유사 종목)
+            if len(peers) == 0:
+                # 전체 시장 데이터 가져오기
+                all_market = stock.get_market_cap_by_ticker(end_date)
+                all_market = all_market[all_market.index != ticker]
+                
+                # 시가총액 차이로 정렬
+                all_market['cap_diff'] = abs(all_market['시가총액'] - target_cap)
+                all_market = all_market.sort_values('cap_diff').head(5)
+                
+                for peer_ticker in all_market.index:
+                    try:
+                        peers.append({
+                            'ticker': peer_ticker,
+                            'name': stock.get_market_ticker_name(peer_ticker),
+                            'marketCap': int(all_market.loc[peer_ticker, '시가총액'])
+                        })
+                    except:
+                        continue
+            
             return {
                 'mainTicker': ticker,
                 'mainName': target_name,
-                'mainSector': target_sector,
+                'mainSector': target_sector if 'target_sector' in locals() else 'N/A',
                 'mainMarketCap': int(target_cap),
                 'peers': peers,
                 'method': 'sector_based' if len(same_sector) > 0 else 'market_cap_similarity'
