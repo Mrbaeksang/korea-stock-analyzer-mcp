@@ -1,27 +1,15 @@
-"""
-한국 주식 데이터 수집 모듈 (Vercel Python Runtime)
-"""
-
-from http.server import BaseHTTPRequestHandler
 import json
-from datetime import datetime, timedelta
-from pykrx import stock
 import traceback
+from http.server import BaseHTTPRequestHandler
+from pykrx import stock
+from datetime import datetime, timedelta
+import pandas as pd
+import numpy as np
 
-
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        """POST 요청 처리"""
+class StockAnalyzer:
+    def handle_request(self, method, params):
+        """요청 처리"""
         try:
-            # 요청 본문 읽기
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            request = json.loads(post_data.decode('utf-8'))
-            
-            # 메서드별 처리
-            method = request.get('method')
-            params = request.get('params', {})
-            
             if method == 'getMarketData':
                 result = self.get_market_data(params.get('ticker'))
             elif method == 'getFinancialData':
@@ -40,181 +28,149 @@ class handler(BaseHTTPRequestHandler):
             # 응답 전송
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps(result, ensure_ascii=False).encode('utf-8'))
+            self.wfile.write(json.dumps(result).encode())
             
         except Exception as e:
-            self.send_error(500, str(e))
-    
-    def do_OPTIONS(self):
-        """CORS preflight 처리"""
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+            error_result = {'error': str(e), 'trace': traceback.format_exc()}
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(error_result).encode())
     
     def get_market_data(self, ticker):
-        """시장 데이터 조회"""
+        """시장 데이터 가져오기"""
         try:
             end_date = datetime.now()
+            start_date = end_date - timedelta(days=30)
             
-            # 최근 거래일 찾기
-            for i in range(7):
-                check_date = (end_date - timedelta(days=i)).strftime('%Y%m%d')
-                ohlcv = stock.get_market_ohlcv_by_date(check_date, check_date, ticker)
-                if not ohlcv.empty:
-                    end_str = check_date
-                    break
-            else:
-                end_str = end_date.strftime('%Y%m%d')
+            end_str = end_date.strftime('%Y%m%d')
+            start_str = start_date.strftime('%Y%m%d')
             
-            # OHLCV 데이터
-            ohlcv = stock.get_market_ohlcv_by_date(end_str, end_str, ticker)
+            # 30일 데이터 가져오기
+            ohlcv = stock.get_market_ohlcv_by_date(start_str, end_str, ticker)
+            
             if ohlcv.empty:
                 return {'error': f'No data for ticker {ticker}'}
             
-            # 시가총액
-            cap = stock.get_market_cap_by_ticker(end_str)
-            market_cap = int(cap.loc[ticker, '시가총액']) if ticker in cap.index else 0
+            # 최신 데이터
+            latest = ohlcv.iloc[-1]
+            # 이전 데이터
+            prev = ohlcv.iloc[-2] if len(ohlcv) > 1 else latest
+            
+            # 52주 최고/최저 계산
+            year_ago = end_date - timedelta(days=365)
+            year_str = year_ago.strftime('%Y%m%d')
+            year_data = stock.get_market_ohlcv_by_date(year_str, end_str, ticker)
+            
+            high_52w = year_data['고가'].max() if not year_data.empty else latest['고가']
+            low_52w = year_data['저가'].min() if not year_data.empty else latest['저가']
+            
+            # 거래대금 계산 (백만원 단위)
+            trading_value = int(latest['거래대금'] / 1000000)
             
             return {
-                'currentPrice': int(ohlcv.iloc[0]['종가']),
-                'volume': int(ohlcv.iloc[0]['거래량']),
-                'open': int(ohlcv.iloc[0]['시가']),
-                'high': int(ohlcv.iloc[0]['고가']),
-                'low': int(ohlcv.iloc[0]['저가']),
-                'marketCap': market_cap,
-                'date': end_str
+                'ticker': ticker,
+                'currentPrice': int(latest['종가']),
+                'previousClose': int(prev['종가']),
+                'change': int(latest['종가'] - prev['종가']),
+                'changePercent': round((latest['종가'] - prev['종가']) / prev['종가'] * 100, 2),
+                'open': int(latest['시가']),
+                'high': int(latest['고가']),
+                'low': int(latest['저가']),
+                'volume': int(latest['거래량']),
+                'tradingValue': trading_value,
+                'high52w': int(high_52w),
+                'low52w': int(low_52w),
+                'marketCap': None  # 시가총액은 별도 API 필요
             }
             
         except Exception as e:
             return {'error': str(e), 'trace': traceback.format_exc()}
     
     def get_financial_data(self, ticker, years=1):
-        """재무 데이터 조회 (년도별 추이 지원)"""
+        """재무 데이터 가져오기"""
         try:
-            import pandas as pd
+            end_date = datetime.now()
+            end_str = end_date.strftime('%Y%m%d')
             
-            if years == 1:
-                # 기존 로직: 최신 데이터만
-                end_date = datetime.now()
-                
-                # 최근 거래일 찾기 (주말/공휴일 대응)
-                for i in range(7):
-                    check_date = (end_date - timedelta(days=i)).strftime('%Y%m%d')
+            # 최신 재무 데이터
+            fundamental = stock.get_market_fundamental_by_ticker(end_str, market="ALL")
+            
+            if ticker not in fundamental.index:
+                return {'error': f'No financial data for {ticker}'}
+            
+            fund = fundamental.loc[ticker]
+            
+            # PER이 0인 경우 (적자 기업) 실제 음수 PER 계산
+            per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
+            eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
+            bps_value = float(fund['BPS']) if pd.notna(fund['BPS']) else None
+            
+            # PER이 0이고 EPS가 음수인 경우 실제 PER 계산
+            if per_value == 0 and eps_value and eps_value < 0:
+                # 현재가 가져오기
+                ohlcv = stock.get_market_ohlcv_by_date(end_str, end_str, ticker)
+                if not ohlcv.empty:
+                    current_price = float(ohlcv.iloc[0]['종가'])
+                    per_value = current_price / eps_value  # 음수 PER
+            
+            # EPS가 0인 경우 이전 데이터에서 찾기
+            if eps_value == 0 and per_value == 0 and bps_value > 0:
+                # 최근 180일간 데이터에서 유효한 EPS 찾기
+                check_date = end_date
+                for i in range(180):
+                    check_date = check_date - timedelta(days=1)
+                    check_str = check_date.strftime('%Y%m%d')
                     try:
-                        fundamental = stock.get_market_fundamental_by_ticker(check_date, market="ALL")
-                        if not fundamental.empty and ticker in fundamental.index:
-                            fund = fundamental.loc[ticker]
-                            
-                            # PER과 EPS 값 가져오기
-                            per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
-                            eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
-                            
-                            # EPS가 0이고 PER도 0인 경우 - 데이터 문제 또는 적자
-                            # BPS가 있으면 데이터는 있는 것이므로 적자로 판단
-                            if eps_value == 0 and per_value == 0:
-                                bps_value = float(fund['BPS']) if pd.notna(fund['BPS']) else 0
-                                if bps_value > 0:
-                                    # BPS가 있으면 실제 적자 상황
-                                    # 이전 분기 EPS 데이터 찾기 시도
-                                    try:
-                                        # 최근 180일 데이터에서 EPS가 0이 아닌 마지막 값 찾기
-                                        start_date = (datetime.strptime(check_date, '%Y%m%d') - timedelta(days=180)).strftime('%Y%m%d')
-                                        hist_fund = stock.get_market_fundamental_by_date(start_date, check_date, ticker)
-                                        hist_fund = hist_fund[hist_fund['EPS'] != 0]
-                                        if not hist_fund.empty:
-                                            last_eps = float(hist_fund.iloc[-1]['EPS'])
-                                            if last_eps < 0:
-                                                # 이전에도 적자였음
-                                                eps_value = last_eps
-                                                ohlcv = stock.get_market_ohlcv_by_date(check_date, check_date, ticker)
-                                                if not ohlcv.empty:
-                                                    current_price = float(ohlcv.iloc[0]['종가'])
-                                                    per_value = current_price / eps_value
-                                            else:
-                                                # 이전엔 흑자였는데 지금 적자 전환
-                                                per_value = None  # 적자 전환 시 PER 계산 불가
-                                                eps_value = None
-                                        else:
-                                            # 과거 데이터도 없음
-                                            eps_value = None
-                                            per_value = None
-                                    except:
-                                        eps_value = None
-                                        per_value = None
-                                else:
-                                    # BPS도 0이면 데이터 자체가 없음
-                                    eps_value = None
-                                    per_value = None
-                            # PER이 0이고 EPS가 음수면 실제 음수 PER 계산
-                            elif per_value == 0 and eps_value and eps_value < 0:
-                                # 현재가 가져오기
-                                ohlcv = stock.get_market_ohlcv_by_date(check_date, check_date, ticker)
+                        hist_fund = stock.get_market_fundamental_by_ticker(check_str, market="ALL")
+                        if ticker in hist_fund.index:
+                            hist_eps = float(hist_fund.loc[ticker, 'EPS'])
+                            if hist_eps != 0:
+                                eps_value = hist_eps
+                                # 현재가로 PER 재계산
+                                ohlcv = stock.get_market_ohlcv_by_date(end_str, end_str, ticker)
                                 if not ohlcv.empty:
                                     current_price = float(ohlcv.iloc[0]['종가'])
-                                    per_value = current_price / eps_value  # 음수 PER
-                            
-                            return {
-                                'ticker': ticker,
-                                'per': per_value,
-                                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) else None,
-                                'eps': eps_value,
-                                'bps': float(fund['BPS']) if pd.notna(fund['BPS']) else None,
-                                'div': float(fund['DIV']) if pd.notna(fund['DIV']) else 0.0,
-                                'dps': float(fund['DPS']) if pd.notna(fund['DPS']) else 0.0
-                            }
+                                    per_value = current_price / eps_value
+                                break
                     except:
                         continue
-            else:
-                # 여러 년도 데이터
-                result = {'ticker': ticker, 'yearly': []}
-                end_date = datetime.now()
-                
-                for year_offset in range(years):
-                    if year_offset == 0:
-                        # 현재 년도는 최신 데이터 사용
-                        year = end_date.year
-                        year_end = end_date.strftime('%Y%m%d')
-                        year_start = (end_date - timedelta(days=10)).strftime('%Y%m%d')
-                    else:
-                        # 과거 년도는 12월 말 기준
-                        year = end_date.year - year_offset
-                        year_end = f"{year}1231"
-                        year_start = f"{year}1220"
+            
+            result = {
+                'ticker': ticker,
+                'per': per_value,
+                'pbr': float(fund['PBR']) if pd.notna(fund['PBR']) else None,
+                'eps': eps_value,
+                'bps': bps_value,
+                'div': float(fund['DIV']) if pd.notna(fund['DIV']) else 0.0,
+                'dps': float(fund['DPS']) if pd.notna(fund['DPS']) else 0.0
+            }
+            
+            # 연도별 데이터 추가 (요청 시)
+            if years > 1:
+                result['yearly'] = []
+                for i in range(years):
+                    year = end_date.year - i
+                    year_end = datetime(year, 12, 31)
+                    
+                    # 주말인 경우 금요일로 조정
+                    while year_end.weekday() > 4:
+                        year_end = year_end - timedelta(days=1)
+                    
+                    year_str = year_end.strftime('%Y%m%d')
                     
                     try:
-                        fundamental = stock.get_market_fundamental_by_date(year_start, year_end, ticker)
-                        if not fundamental.empty:
-                            # 마지막 거래일 데이터
-                            fund = fundamental.iloc[-1]
+                        year_fund = stock.get_market_fundamental_by_ticker(year_str, market="ALL")
+                        if ticker in year_fund.index:
+                            fund = year_fund.loc[ticker]
                             
+                            # PER 처리
                             per_value = float(fund['PER']) if pd.notna(fund['PER']) else None
                             eps_value = float(fund['EPS']) if pd.notna(fund['EPS']) else None
                             
-                            # EPS가 0이면 이전 데이터 사용 시도 (데이터 문제 해결)
-                            if eps_value == 0 and per_value == 0:
-                                bps_value = float(fund['BPS']) if pd.notna(fund['BPS']) else 0
-                                if bps_value > 0:
-                                    # BPS가 있으면 데이터는 있지만 EPS가 0인 상황
-                                    # 이전 유효한 EPS 찾기
-                                    try:
-                                        start_search = f"{year}0101"
-                                        hist = stock.get_market_fundamental_by_date(start_search, year_end, ticker)
-                                        hist = hist[hist['EPS'] != 0]
-                                        if not hist.empty:
-                                            eps_value = float(hist.iloc[-1]['EPS'])
-                                            if eps_value < 0:
-                                                year_ohlcv = stock.get_market_ohlcv_by_date(year_end, year_end, ticker)
-                                                if not year_ohlcv.empty:
-                                                    year_price = float(year_ohlcv.iloc[0]['종가'])
-                                                    per_value = year_price / eps_value
-                                    except:
-                                        pass
-                            # PER이 0이고 EPS가 음수면 실제 음수 PER 계산  
-                            elif per_value == 0 and eps_value and eps_value < 0:
+                            # PER이 0이고 EPS가 음수인 경우
+                            if per_value == 0 and eps_value and eps_value < 0:
                                 # 현재가 가져오기 (yearly 데이터는 해당 년도 말 기준)
                                 year_ohlcv = stock.get_market_ohlcv_by_date(year_end, year_end, ticker)
                                 if not year_ohlcv.empty:
@@ -267,177 +223,241 @@ class handler(BaseHTTPRequestHandler):
             gains = deltas.where(deltas > 0, 0)
             losses = -deltas.where(deltas < 0, 0)
             
-            avg_gain = gains.rolling(14).mean()
-            avg_loss = losses.rolling(14).mean()
+            avg_gain = gains.rolling(window=14).mean()
+            avg_loss = losses.rolling(window=14).mean()
             
             rs = avg_gain / avg_loss
             rsi = 100 - (100 / (1 + rs))
-            rsi_value = rsi.iloc[-1] if not rsi.empty else 50
+            current_rsi = rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50
             
             # 볼린저 밴드
-            std20 = closes[-20:].std() if len(closes) >= 20 else 0
-            bb_upper = ma20 + (std20 * 2)
-            bb_lower = ma20 - (std20 * 2)
+            sma20 = ohlcv['종가'].rolling(window=20).mean()
+            std20 = ohlcv['종가'].rolling(window=20).std()
+            upper_band = sma20 + (std20 * 2)
+            lower_band = sma20 - (std20 * 2)
             
-            # 변동성
-            returns = ohlcv['종가'].pct_change().dropna()
-            volatility = returns.std() * (252 ** 0.5) * 100  # 연간 변동성
+            # 최근 값
+            current_price = closes[-1]
             
             return {
+                'ticker': ticker,
+                'currentPrice': int(current_price),
                 'ma5': int(ma5),
                 'ma20': int(ma20),
                 'ma60': int(ma60),
-                'rsi14': float(rsi_value),
-                'bollingerUpper': int(bb_upper),
-                'bollingerLower': int(bb_lower),
-                'volatilityAnnual': float(volatility),
-                'currentPrice': int(closes[-1])
+                'rsi14': round(current_rsi, 2),
+                'bollingerUpper': int(upper_band.iloc[-1]) if not pd.isna(upper_band.iloc[-1]) else None,
+                'bollingerMiddle': int(sma20.iloc[-1]) if not pd.isna(sma20.iloc[-1]) else None,
+                'bollingerLower': int(lower_band.iloc[-1]) if not pd.isna(lower_band.iloc[-1]) else None,
+                'volatility': round(std20.iloc[-1] / sma20.iloc[-1] * 100, 2) if not pd.isna(std20.iloc[-1]) else None
+            }
+            
+        except Exception as e:
+            return {'error': str(e), 'trace': traceback.format_exc()}
+    
+    def calculate_dcf(self, ticker, growth_rate=0.05, discount_rate=0.1):
+        """DCF 가치평가"""
+        try:
+            # 재무 데이터 가져오기
+            financial = self.get_financial_data(ticker, years=3)
+            
+            if 'error' in financial:
+                return financial
+            
+            eps = financial.get('eps', 0)
+            if not eps or eps <= 0:
+                return {'error': 'Cannot calculate DCF with negative or zero EPS'}
+            
+            # FCF 추정 (EPS의 70% 가정)
+            fcf = eps * 0.7
+            
+            # 5년간 FCF 예측
+            projected_fcf = []
+            for year in range(1, 6):
+                fcf_year = fcf * ((1 + growth_rate) ** year)
+                projected_fcf.append(fcf_year)
+            
+            # 터미널 가치 (영구 성장률 2% 가정)
+            terminal_growth = 0.02
+            terminal_value = projected_fcf[-1] * (1 + terminal_growth) / (discount_rate - terminal_growth)
+            
+            # 현재가치 계산
+            pv_fcf = sum([fcf / ((1 + discount_rate) ** (i+1)) for i, fcf in enumerate(projected_fcf)])
+            pv_terminal = terminal_value / ((1 + discount_rate) ** 5)
+            
+            # 적정 주가
+            intrinsic_value = pv_fcf + pv_terminal
+            
+            # 현재가 가져오기
+            market_data = self.get_market_data(ticker)
+            current_price = market_data.get('currentPrice', 0)
+            
+            return {
+                'ticker': ticker,
+                'currentPrice': current_price,
+                'intrinsicValue': int(intrinsic_value),
+                'upside': round((intrinsic_value - current_price) / current_price * 100, 2) if current_price > 0 else None,
+                'assumptions': {
+                    'growthRate': f"{growth_rate*100}%",
+                    'discountRate': f"{discount_rate*100}%",
+                    'terminalGrowth': "2%"
+                },
+                'projectedFCF': [int(fcf) for fcf in projected_fcf],
+                'terminalValue': int(terminal_value)
             }
             
         except Exception as e:
             return {'error': str(e), 'trace': traceback.format_exc()}
     
     def get_supply_demand(self, ticker):
-        """수급 데이터 조회"""
+        """수급 데이터 가져오기"""
         try:
             end_date = datetime.now()
+            start_date = end_date - timedelta(days=30)
             
-            # 최근 거래일 찾기
-            for i in range(10):  # 더 많은 날짜 탐색
-                check_date = (end_date - timedelta(days=i))
-                end_str = check_date.strftime('%Y%m%d')
-                start_date = check_date - timedelta(days=30)  # 더 긴 기간
-                start_str = start_date.strftime('%Y%m%d')
-                
-                try:
-                    # 투자자별 순매수대금 데이터
-                    investor = stock.get_market_trading_value_by_date(start_str, end_str, ticker)
-                    
-                    if not investor.empty and len(investor) > 0:
-                        # NaN 값을 0으로 처리
-                        investor = investor.fillna(0)
-                        
-                        # 실제 컬럼 확인
-                        columns = investor.columns.tolist()
-                        
-                        # 기본값
-                        foreign_net = 0
-                        institution_net = 0
-                        individual_net = 0
-                        
-                        # pykrx 컬럼명: 기관합계, 기타법인, 개인, 외국인합계, 전체
-                        if '외국인합계' in columns:
-                            foreign_net = investor['외국인합계'].sum()
-                        elif '외국인' in columns:
-                            foreign_net = investor['외국인'].sum()
-                            
-                        if '기관합계' in columns:
-                            institution_net = investor['기관합계'].sum()
-                        elif '기관' in columns:
-                            institution_net = investor['기관'].sum()
-                            
-                        if '개인' in columns:
-                            individual_net = investor['개인'].sum()
-                        
-                        # 최근 5일 데이터
-                        recent_5d = investor.tail(5) if len(investor) >= 5 else investor
-                        
-                        foreign_5d = 0
-                        institution_5d = 0
-                        individual_5d = 0
-                        
-                        if '외국인합계' in columns:
-                            foreign_5d = recent_5d['외국인합계'].sum()
-                        elif '외국인' in columns:
-                            foreign_5d = recent_5d['외국인'].sum()
-                            
-                        if '기관합계' in columns:
-                            institution_5d = recent_5d['기관합계'].sum()
-                        elif '기관' in columns:
-                            institution_5d = recent_5d['기관'].sum()
-                            
-                        if '개인' in columns:
-                            individual_5d = recent_5d['개인'].sum()
-                        
-                        return {
-                            'recent': {
-                                'foreignNet': int(foreign_net),
-                                'institutionNet': int(institution_net),
-                                'individualNet': int(individual_net)
-                            },
-                            'fiveDays': {
-                                'foreignNet': int(foreign_5d),
-                                'institutionNet': int(institution_5d),
-                                'individualNet': int(individual_5d)
-                            },
-                            'period': f'{start_str} ~ {end_str}',
-                            'dataPoints': len(investor)
-                        }
-                except Exception as e:
-                    # 더 구체적인 에러 로깅
-                    print(f"Error for date {end_str}: {str(e)}")
-                    continue
+            end_str = end_date.strftime('%Y%m%d')
+            start_str = start_date.strftime('%Y%m%d')
             
-            # 데이터가 없는 경우 0으로 반환
+            # 투자자별 거래 데이터
+            investor_data = stock.get_market_net_purchases_of_equities_by_ticker(start_str, end_str, ticker, "순매수금액")
+            
+            if investor_data.empty:
+                return {'error': f'No supply/demand data for {ticker}'}
+            
+            # 최근 30일 합계 (억원 단위)
+            foreign_sum = investor_data['외국인합계'].sum() / 100000000
+            institution_sum = investor_data['기관합계'].sum() / 100000000
+            individual_sum = investor_data['개인'].sum() / 100000000
+            
+            # 일별 데이터 (최근 10일)
+            recent_data = investor_data.tail(10)
+            daily_data = []
+            
+            for date, row in recent_data.iterrows():
+                daily_data.append({
+                    'date': date.strftime('%Y-%m-%d'),
+                    'foreign': round(row['외국인합계'] / 100000000, 2),
+                    'institution': round(row['기관합계'] / 100000000, 2),
+                    'individual': round(row['개인'] / 100000000, 2)
+                })
+            
             return {
-                'recent': {
-                    'foreignNet': 0,
-                    'institutionNet': 0,
-                    'individualNet': 0
+                'ticker': ticker,
+                'period': '30days',
+                'summary': {
+                    'foreign': round(foreign_sum, 2),
+                    'institution': round(institution_sum, 2),
+                    'individual': round(individual_sum, 2)
                 },
-                'fiveDays': {
-                    'foreignNet': 0,
-                    'institutionNet': 0,
-                    'individualNet': 0
-                },
-                'period': 'No data available'
+                'daily': daily_data
             }
             
         except Exception as e:
             return {'error': str(e), 'trace': traceback.format_exc()}
     
     def search_ticker(self, company_name):
-        """종목명으로 종목코드 검색"""
+        """종목명으로 종목코드 검색 - 유연한 매칭"""
         try:
             from datetime import datetime, timedelta
+            import re
             
             # 어제 날짜
             end_date = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
             
-            # KOSPI와 KOSDAQ 모든 종목 가져오기
+            # 시가총액 데이터 한 번만 가져오기
+            cap_data = stock.get_market_cap_by_ticker(end_date)
+            
+            # 전체 종목 리스트
+            all_tickers = []
+            
+            # KOSPI 종목
             kospi_tickers = stock.get_market_ticker_list(end_date, market="KOSPI")
-            kosdaq_tickers = stock.get_market_ticker_list(end_date, market="KOSDAQ")
-            
-            results = []
-            
-            # KOSPI 검색
             for ticker in kospi_tickers:
                 name = stock.get_market_ticker_name(ticker)
-                if company_name.lower() in name.lower():
-                    cap = stock.get_market_cap_by_ticker(end_date)
-                    if ticker in cap.index:
-                        results.append({
-                            'ticker': ticker,
-                            'name': name,
-                            'market': 'KOSPI',
-                            'marketCap': int(cap.loc[ticker, '시가총액'])
-                        })
+                if ticker in cap_data.index:
+                    all_tickers.append({
+                        'ticker': ticker,
+                        'name': name,
+                        'market': 'KOSPI',
+                        'marketCap': int(cap_data.loc[ticker, '시가총액'])
+                    })
             
-            # KOSDAQ 검색
+            # KOSDAQ 종목
+            kosdaq_tickers = stock.get_market_ticker_list(end_date, market="KOSDAQ")
             for ticker in kosdaq_tickers:
                 name = stock.get_market_ticker_name(ticker)
-                if company_name.lower() in name.lower():
-                    cap = stock.get_market_cap_by_ticker(end_date)
-                    if ticker in cap.index:
-                        results.append({
-                            'ticker': ticker,
-                            'name': name,
-                            'market': 'KOSDAQ',
-                            'marketCap': int(cap.loc[ticker, '시가총액'])
-                        })
+                if ticker in cap_data.index:
+                    all_tickers.append({
+                        'ticker': ticker,
+                        'name': name,
+                        'market': 'KOSDAQ',
+                        'marketCap': int(cap_data.loc[ticker, '시가총액'])
+                    })
             
-            # 시가총액 순으로 정렬
-            results.sort(key=lambda x: x['marketCap'], reverse=True)
+            # 검색어 정규화
+            query_normalized = re.sub(r'[^\w가-힣]', '', company_name.lower())
+            query_words = company_name.lower().split()
+            
+            # 점수 기반 매칭
+            scored_results = []
+            
+            for stock_info in all_tickers:
+                name = stock_info['name']
+                name_lower = name.lower()
+                name_normalized = re.sub(r'[^\w가-힣]', '', name_lower)
+                
+                score = 0
+                
+                # 완전 일치
+                if query_normalized == name_normalized:
+                    score = 1000
+                # 공백 제거 후 일치
+                elif company_name.replace(' ', '').lower() == name.replace(' ', '').lower():
+                    score = 900
+                # 전체 쿼리가 이름에 포함
+                elif company_name.lower() in name_lower:
+                    score = 800
+                # 이름이 쿼리에 포함 (짧은 이름 우선)
+                elif name_lower in company_name.lower():
+                    score = 700 - len(name)
+                # 정규화된 쿼리가 정규화된 이름에 포함
+                elif query_normalized in name_normalized:
+                    score = 600
+                # 정규화된 이름이 정규화된 쿼리에 포함
+                elif name_normalized in query_normalized:
+                    score = 500
+                # 모든 쿼리 단어가 이름에 포함
+                elif query_words and all(word in name_lower for word in query_words):
+                    score = 400
+                # 일부 쿼리 단어가 이름에 포함
+                elif query_words:
+                    matching_words = sum(1 for word in query_words if word in name_lower)
+                    if matching_words > 0:
+                        score = 200 + (matching_words * 50)
+                
+                # 문자 유사도 추가 점수 (편집 거리 기반)
+                if score == 0:
+                    # 간단한 문자 일치 비율
+                    common_chars = set(query_normalized) & set(name_normalized)
+                    if len(common_chars) > 0:
+                        similarity = len(common_chars) / max(len(query_normalized), len(name_normalized))
+                        if similarity > 0.5:  # 50% 이상 문자 일치
+                            score = int(similarity * 100)
+                
+                if score > 0:
+                    scored_results.append({
+                        **stock_info,
+                        'score': score
+                    })
+            
+            # 점수와 시가총액으로 정렬
+            scored_results.sort(key=lambda x: (x['score'], x['marketCap']), reverse=True)
+            
+            # 상위 10개만 반환
+            top_results = scored_results[:10]
+            
+            # score 필드 제거
+            results = [{k: v for k, v in item.items() if k != 'score'} for item in top_results]
             
             return {
                 'query': company_name,
@@ -535,7 +555,10 @@ class handler(BaseHTTPRequestHandler):
                     except:
                         continue
             else:
-                # 같은 업종이 없으면 시가총액 유사 종목으로 대체
+                peers = []  # 빈 배열로 초기화
+                
+            # 같은 업종이 없거나 peers가 비어있으면 시가총액 유사 종목으로 대체
+            if len(peers) == 0:
                 if target_cap > 10000000000000:  # 10조원 이상
                     min_ratio, max_ratio = 0.1, 10.0
                 elif target_cap > 1000000000000:  # 1조원 이상
@@ -549,9 +572,8 @@ class handler(BaseHTTPRequestHandler):
                     (sector_data.index != ticker)
                 ].sort_values('시가총액', ascending=False)
                 
-                peer_tickers = similar_caps.index[:5].tolist()
+                peer_tickers = similar_caps.index[:10].tolist()  # 10개로 늘림
                 
-                peers = []
                 for peer_ticker in peer_tickers:
                     try:
                         peer_info = similar_caps.loc[peer_ticker]
@@ -559,8 +581,10 @@ class handler(BaseHTTPRequestHandler):
                             'ticker': peer_ticker,
                             'name': peer_info['종목명'],
                             'marketCap': int(peer_info['시가총액']),
-                            'sector': peer_info['업종명']  # 다른 업종임을 표시
+                            'sector': peer_info['업종명']
                         })
+                        if len(peers) >= 5:  # 5개 찾으면 중단
+                            break
                     except:
                         continue
             
@@ -595,3 +619,20 @@ class handler(BaseHTTPRequestHandler):
             
         except Exception as e:
             return {'error': str(e), 'trace': traceback.format_exc()}
+
+def handler(request, response):
+    """Vercel 핸들러"""
+    if request.method == 'POST':
+        body = json.loads(request.body)
+        method = body.get('method')
+        params = body.get('params', {})
+        
+        analyzer = StockAnalyzer()
+        result = analyzer.handle_request(method, params)
+        
+        response.status_code = 200
+        response.headers['Content-Type'] = 'application/json'
+        return json.dumps(result)
+    
+    response.status_code = 405
+    return json.dumps({'error': 'Method not allowed'})
