@@ -487,6 +487,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
                   properties: {
                     company_name: {
                       type: 'string',
+                      title: '회사명',
                       description: '검색할 회사명 (예: "삼성전자", "카카오")',
                     },
                   },

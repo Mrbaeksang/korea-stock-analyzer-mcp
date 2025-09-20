@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import pathlib
 import traceback
 from datetime import datetime, timedelta
+from http.server import BaseHTTPRequestHandler
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -36,6 +39,9 @@ INVESTOR_MAP = {
 }
 
 _MARKET_CACHE: Dict[str, str] = {}
+
+MPLCONFIGDIR = os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+pathlib.Path(MPLCONFIGDIR).mkdir(parents=True, exist_ok=True)
 
 
 class StockAnalyzerError(Exception):
@@ -652,6 +658,44 @@ class StockAnalyzer:
             "upsidePercent": round(upside, 2) if upside is not None else None,
             "recommendation": recommendation,
         }
+
+
+class VercelRequestHandler(BaseHTTPRequestHandler):
+    analyzer = StockAnalyzer()
+
+    def _write_json(self, status: int, payload: Dict[str, Any]) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:  # pragma: no cover - preflight support
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
+    def do_POST(self) -> None:  # pragma: no cover - runtime only
+        try:
+            length = int(self.headers.get('Content-Length') or 0)
+            raw = self.rfile.read(length).decode('utf-8')
+            payload = json.loads(raw or '{}')
+        except Exception:
+            self._write_json(400, _error_response(400, "잘못된 JSON 요청입니다."))
+            return
+
+        method = payload.get('method')
+        params = payload.get('params', {})
+        result = self.analyzer.dispatch(method, params)
+
+        status = result.get('status', 200)
+        self._write_json(status, result)
+
+    def log_message(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - silence logs
+        return
 
 
 def handler(request, response):
