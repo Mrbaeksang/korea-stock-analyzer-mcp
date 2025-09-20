@@ -1,202 +1,284 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
-// Python API 엔드포인트 호출
-async function callPythonAPI(method: string, params: any): Promise<any> {
+const BASE_URL = process.env.KOREA_STOCK_ANALYZER_API ?? 'https://korea-stock-analyzer-mcp.vercel.app';
+
+interface PythonSuccess<T> {
+  success: true;
+  status: number;
+  data: T;
+}
+
+interface PythonFailure {
+  success: false;
+  status: number;
+  error?: {
+    message?: string;
+    detail?: unknown;
+  };
+}
+
+type PythonResponse<T> = PythonSuccess<T> | PythonFailure;
+
+type InvestorKey = 'foreign' | 'institution' | 'individual';
+
+export interface MarketSnapshot {
+  ticker: string;
+  market: string;
+  asOf: string;
+  close: number | null;
+  previousClose: number | null;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  volume: number | null;
+  tradingValue: number | null;
+  change: number | null;
+  changePercent: number | null;
+  turnoverPercent: number | null;
+  marketCap: number | null;
+  shareCount: number | null;
+  fiftyTwoWeek: {
+    high: number | null;
+    low: number | null;
+  };
+  history: Array<{ date: string; close: number | null; volume: number | null }>;
+  marketCapDate?: string | null;
+}
+
+export interface FinancialSnapshot {
+  ticker: string;
+  asOf: string;
+  metrics: {
+    per: number | null;
+    pbr: number | null;
+    eps: number | null;
+    bps: number | null;
+    roe: number | null;
+    dividendYield: number | null;
+    dividendPerShare: number | null;
+  };
+  yearly?: Array<{
+    year: number;
+    per: number | null;
+    pbr: number | null;
+    eps: number | null;
+    bps: number | null;
+    dividendYield: number | null;
+    dividendPerShare: number | null;
+    asOf: string;
+  }>;
+}
+
+export interface TechnicalSnapshot {
+  ticker: string;
+  asOf: string;
+  price: number | null;
+  movingAverages: {
+    ma5: number | null;
+    ma20: number | null;
+    ma60: number | null;
+  };
+  rsi14: number | null;
+  macd: {
+    line: number | null;
+    signal: number | null;
+    histogram: number | null;
+  };
+  bollinger: {
+    upper: number | null;
+    middle: number | null;
+    lower: number | null;
+  };
+  stochastic: {
+    k: number | null;
+    d: number | null;
+  };
+  volatility: number | null;
+}
+
+export interface SupplyDemandSnapshot {
+  ticker: string;
+  market: string;
+  period: {
+    from: string;
+    to: string;
+  };
+  netAmountByInvestor: Record<InvestorKey, number | null>;
+  netVolumeByInvestor: Record<InvestorKey, number | null>;
+  recent: Array<{
+    date: string;
+    foreign: number | null;
+    institution: number | null;
+    individual: number | null;
+  }>;
+}
+
+export interface TickerSuggestion {
+  ticker: string;
+  name: string;
+  market: string;
+  marketCap: number | null;
+  price: number | null;
+}
+
+export interface TickerSearchResult {
+  query: string;
+  count: number;
+  results: TickerSuggestion[];
+  asOf: string;
+}
+
+export interface PeerComparison {
+  ticker: string;
+  market: string;
+  asOf: string;
+  base: {
+    price: number | null;
+    marketCap: number | null;
+  };
+  peers: Array<{
+    ticker: string;
+    name: string;
+    price: number | null;
+    marketCap: number | null;
+  }>;
+}
+
+export interface DCFValuation {
+  ticker: string;
+  assumptions: {
+    growthRate: number;
+    discountRate: number;
+    terminalGrowth: number;
+  };
+  projectedEPS: number[];
+  discountedEPS: number[];
+  intrinsicValue: number;
+  currentPrice: number;
+  fairValue: number;
+  upsidePercent: number | null;
+  recommendation: string | null;
+}
+
+interface ErrorResult {
+  ticker: string;
+  error: string;
+}
+
+async function callPythonAPI<T>(method: string, params: Record<string, unknown>): Promise<T> {
   try {
-    // 전체 URL 사용
-    const baseUrl = 'https://korea-stock-analyzer-mcp.vercel.app';
-    
-    const response = await axios.post(`${baseUrl}/api/stock_data`, {
-      method,
-      params
-    }, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000 // 30초 타임아웃
-    });
-    
-    return response.data;
-  } catch (error: any) {
-    console.error(`Python API call failed for ${method}:`, error.message);
-    throw error;
+    const { data } = await axios.post<PythonResponse<T>>(
+      `${BASE_URL}/api/stock_data`,
+      { method, params },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 45000,
+      }
+    );
+
+    if ((data as PythonFailure).success === false) {
+      const failure = data as PythonFailure;
+      const message = failure.error?.message ?? `Python backend error (${method})`;
+      const error = new Error(message);
+      (error as any).detail = failure.error?.detail;
+      throw error;
+    }
+
+    return (data as PythonSuccess<T>).data;
+  } catch (err) {
+    const message = normalizeAxiosError(err);
+    throw new Error(message);
   }
 }
 
-// 시장 데이터 가져오기
-export async function getMarketData(ticker: string): Promise<any> {
-  try {
-    const data = await callPythonAPI('getMarketData', { ticker });
-    
-    if (data.error) {
-      throw new Error(data.error);
+function normalizeAxiosError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError<PythonResponse<unknown>>;
+    const responseData = axiosError.response?.data;
+    if (responseData && (responseData as PythonFailure).success === false) {
+      const failure = responseData as PythonFailure;
+      if (failure.error?.message) {
+        return failure.error.message;
+      }
     }
-    
-    return data;
+    if (axiosError.code === 'ECONNABORTED') {
+      return 'Python 백엔드 응답이 지연되었습니다.';
+    }
+    return axiosError.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return '알 수 없는 오류가 발생했습니다.';
+}
+
+export async function getMarketData(ticker: string): Promise<MarketSnapshot | ErrorResult> {
+  try {
+    return await callPythonAPI<MarketSnapshot>('getMarketData', { ticker });
   } catch (error) {
     console.error('getMarketData error:', error);
-    return {
-      ticker,
-      error: 'Failed to fetch market data'
-    };
+    return { ticker, error: (error as Error).message };
   }
 }
 
-// 재무 데이터 가져오기
-export async function getFinancialData(ticker: string, years: number = 1): Promise<any> {
+export async function getFinancialData(ticker: string, years = 1): Promise<FinancialSnapshot | ErrorResult> {
   try {
-    const data = await callPythonAPI('getFinancialData', { ticker, years });
-    
-    if (data.error) {
-      throw new Error(data.error);
-    }
-    
-    // yearly 데이터가 있으면 그대로 반환
-    if (data.yearly && data.yearly.length > 0) {
-      return data;
-    }
-    
-    // 단일 데이터인 경우 기존 형식으로 변환
-    return {
-      ticker,
-      currentPrice: 0, // 시장 데이터에서 가져와야 함
-      per: data.per?.toFixed(2) || 'N/A',
-      pbr: data.pbr?.toFixed(2) || 'N/A',
-      eps: data.eps?.toFixed(0) || 'N/A',
-      roe: data.pbr && data.per ? ((data.pbr / data.per) * 100).toFixed(2) : 'N/A',
-      bps: data.bps?.toFixed(0) || 'N/A',
-      div: data.div?.toFixed(2) || 'N/A'
-    };
+    return await callPythonAPI<FinancialSnapshot>('getFinancialData', { ticker, years });
   } catch (error) {
     console.error('getFinancialData error:', error);
-    return {
-      ticker,
-      error: 'Failed to fetch financial data'
-    };
+    return { ticker, error: (error as Error).message };
   }
 }
 
-// 기술적 지표 가져오기
-export async function getTechnicalIndicators(ticker: string): Promise<any> {
+export async function getTechnicalIndicators(ticker: string): Promise<TechnicalSnapshot | ErrorResult> {
   try {
-    const data = await callPythonAPI('getTechnicalIndicators', { ticker });
-    
-    if (data.error) {
-      throw new Error(data.error);
-    }
-    
-    return {
-      RSI: data.rsi14,
-      MACD: 0, // Python에서 계산 추가 필요
-      MA20: data.ma20,
-      MA50: data.ma60, // ma60을 ma50으로 사용
-      BollingerBands: `Upper: ${data.bollingerUpper}, Lower: ${data.bollingerLower}`,
-      Stochastic: 0 // Python에서 계산 추가 필요
-    };
+    return await callPythonAPI<TechnicalSnapshot>('getTechnicalIndicators', { ticker });
   } catch (error) {
     console.error('getTechnicalIndicators error:', error);
-    return {
-      ticker,
-      error: 'Failed to fetch technical indicators'
-    };
+    return { ticker, error: (error as Error).message };
   }
 }
 
-// DCF 계산
-export async function calculateDCF(ticker: string, growthRate?: number, discountRate?: number): Promise<any> {
+export async function getSupplyDemand(ticker: string, days = 30): Promise<SupplyDemandSnapshot | ErrorResult> {
   try {
-    // 재무 데이터와 시장 데이터 가져오기
-    const [financialData, marketData] = await Promise.all([
-      callPythonAPI('getFinancialData', { ticker }),
-      callPythonAPI('getMarketData', { ticker })
-    ]);
-    
-    if (financialData.error || marketData.error) {
-      throw new Error('Failed to fetch data for DCF calculation');
-    }
-    
-    const currentPrice = marketData.currentPrice;
-    const eps = financialData.eps || 0;
-    
-    // DCF 계산 (간단한 버전)
-    const growth = (growthRate || 5) / 100;
-    const discount = (discountRate || 10) / 100;
-    
-    // 5년간 예상 EPS의 현재가치
-    let fairValue = 0;
-    for (let i = 1; i <= 5; i++) {
-      const futureEPS = eps * Math.pow(1 + growth, i);
-      const presentValue = futureEPS / Math.pow(1 + discount, i);
-      fairValue += presentValue;
-    }
-    
-    // 터미널 가치 (간단한 영구성장모델)
-    const terminalGrowth = 0.03; // 3% 영구성장
-    const terminalValue = (eps * Math.pow(1 + growth, 5) * (1 + terminalGrowth)) / (discount - terminalGrowth);
-    const terminalPV = terminalValue / Math.pow(1 + discount, 5);
-    
-    fairValue += terminalPV;
-    
-    // PER 배수 적용 (보수적으로 15배)
-    fairValue = fairValue * 15;
-    
-    const upside = ((fairValue - currentPrice) / currentPrice) * 100;
-    
-    return {
-      fairValue: Math.round(fairValue),
-      currentPrice,
-      upside: upside.toFixed(1),
-      recommendation: upside > 20 ? '매수' : upside > 0 ? '보유' : '매도'
-    };
-  } catch (error) {
-    console.error('calculateDCF error:', error);
-    return {
-      ticker,
-      error: 'Failed to calculate DCF'
-    };
-  }
-}
-
-// 뉴스 검색 (실제 구현 필요)
-export async function searchNews(ticker: string, days?: number): Promise<any[]> {
-  // 네이버 뉴스 API나 크롤링 구현 필요
-  // 임시로 빈 배열 반환
-  return [
-    {
-      title: `${ticker} 관련 최신 뉴스`,
-      date: new Date().toLocaleDateString('ko-KR'),
-      summary: '뉴스 API 연동이 필요합니다.',
-      sentiment: '중립'
-    }
-  ];
-}
-
-// 수급 데이터 가져오기
-export async function getSupplyDemand(ticker: string): Promise<any> {
-  try {
-    const data = await callPythonAPI('getSupplyDemand', { ticker });
-    
-    if (data.error) {
-      throw new Error(data.error);
-    }
-    
-    // 억원 단위로 변환
-    return {
-      foreign: Math.round(data.recent.foreignNet / 100000000),
-      institution: Math.round(data.recent.institutionNet / 100000000),
-      individual: Math.round(data.recent.individualNet / 100000000),
-      fiveDays: {
-        foreign: Math.round(data.fiveDays.foreignNet / 100000000),
-        institution: Math.round(data.fiveDays.institutionNet / 100000000),
-        individual: Math.round(data.fiveDays.individualNet / 100000000)
-      }
-    };
+    return await callPythonAPI<SupplyDemandSnapshot>('getSupplyDemand', { ticker, days });
   } catch (error) {
     console.error('getSupplyDemand error:', error);
-    return {
-      ticker,
-      error: 'Failed to fetch supply/demand data'
-    };
+    return { ticker, error: (error as Error).message };
   }
 }
 
+export async function searchTicker(companyName: string): Promise<TickerSearchResult | { error: string }> {
+  try {
+    return await callPythonAPI<TickerSearchResult>('searchTicker', { company_name: companyName });
+  } catch (error) {
+    console.error('searchTicker error:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function searchPeers(ticker: string): Promise<PeerComparison | ErrorResult> {
+  try {
+    return await callPythonAPI<PeerComparison>('searchPeers', { ticker });
+  } catch (error) {
+    console.error('searchPeers error:', error);
+    return { ticker, error: (error as Error).message };
+  }
+}
+
+export async function calculateDCF(
+  ticker: string,
+  growthRate?: number,
+  discountRate?: number,
+): Promise<DCFValuation | ErrorResult> {
+  try {
+    return await callPythonAPI<DCFValuation>('calculateDCF', { ticker, growth_rate: growthRate, discount_rate: discountRate });
+  } catch (error) {
+    console.error('calculateDCF error:', error);
+    return { ticker, error: (error as Error).message };
+  }
+}
+
+export async function searchNews(_ticker: string, _days?: number): Promise<any[]> {
+  return [];
+}
