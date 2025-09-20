@@ -39,6 +39,7 @@ INVESTOR_MAP = {
 }
 
 _MARKET_CACHE: Dict[str, str] = {}
+_FUNDAMENTAL_CACHE: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
 
 MPLCONFIGDIR = os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 pathlib.Path(MPLCONFIGDIR).mkdir(parents=True, exist_ok=True)
@@ -136,22 +137,38 @@ def _find_market_date_for_ticker(
 def _find_fundamental_row(
     ticker: str,
     reference_date: Optional[datetime] = None,
-    lookback: int = MAX_LOOKBACK_DAYS,
+    lookback: int = 14,
+    market: str = "ALL",
 ) -> Tuple[datetime, str, pd.Series]:
     cursor = reference_date or datetime.now()
+    market_key = market if market != "UNKNOWN" else "ALL"
+
     for _ in range(lookback):
         date_str = cursor.strftime("%Y%m%d")
-        frame = stock.get_market_fundamental_by_ticker(date_str, market="ALL")
-        if not frame.empty and ticker in frame.index:
-            row = frame.loc[ticker]
+        cache_key = (ticker, date_str, market_key)
+        row_dict = _FUNDAMENTAL_CACHE.get(cache_key)
+
+        if row_dict is None:
+            frame = stock.get_market_fundamental_by_ticker(date_str, market=market_key)
+            if not frame.empty and ticker in frame.index:
+                row = frame.loc[ticker]
+                row_dict = row.to_dict()
+                _FUNDAMENTAL_CACHE[cache_key] = row_dict
+            else:
+                row_dict = None
+
+        if row_dict:
+            series = pd.Series(row_dict)
             if all(
-                (pd.isna(row.get(field)) or float(row.get(field) or 0) == 0.0)
+                (pd.isna(series.get(field)) or float(series.get(field) or 0) == 0.0)
                 for field in ("PER", "PBR", "EPS", "BPS")
             ):
                 cursor -= timedelta(days=1)
                 continue
-            return cursor, date_str, row
+            return cursor, date_str, series
+
         cursor -= timedelta(days=1)
+
     raise StockAnalyzerError("재무 데이터를 찾을 수 없습니다.", status=404)
 
 
@@ -300,8 +317,10 @@ class StockAnalyzer:
 
     def get_financial_data(self, params: Dict[str, Any]) -> Dict[str, Any]:
         ticker = _require_ticker(params)
-        years = int(params.get("years", 1) or 1)
-        as_of_dt, as_of_str, row = _find_fundamental_row(ticker)
+        years = max(1, min(int(params.get("years", 1) or 1), 5))
+        market_hint = _detect_market(ticker, datetime.now().strftime("%Y%m%d"))
+        market_scope = market_hint if market_hint != "UNKNOWN" else "ALL"
+        as_of_dt, as_of_str, row = _find_fundamental_row(ticker, market=market_scope)
 
         per = _to_float(row.get("PER"))
         pbr = _to_float(row.get("PBR"))
@@ -330,11 +349,20 @@ class StockAnalyzer:
             yearly: List[Dict[str, Any]] = []
             for offset in range(years):
                 year = as_of_dt.year - offset
-                target_dt = datetime(year, 12, 31)
-                try:
-                    _, year_str, year_row = _find_fundamental_row(ticker, reference_date=target_dt)
-                except StockAnalyzerError:
-                    continue
+                if offset == 0:
+                    year_row = row
+                    year_str = as_of_str
+                else:
+                    target_dt = datetime(year, 12, 31)
+                    try:
+                        _, year_str, year_row = _find_fundamental_row(
+                            ticker,
+                            reference_date=target_dt,
+                            market=market_scope,
+                        )
+                    except StockAnalyzerError:
+                        continue
+
                 yearly.append(
                     {
                         "year": year,
