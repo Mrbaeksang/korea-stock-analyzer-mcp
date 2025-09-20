@@ -660,25 +660,24 @@ class StockAnalyzer:
         }
 
 
-class VercelRequestHandler(BaseHTTPRequestHandler):
+class Handler(BaseHTTPRequestHandler):  # pragma: no cover - executed in Vercel runtime
     analyzer = StockAnalyzer()
 
     def _write_json(self, status: int, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         self.send_response(status)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    def do_OPTIONS(self) -> None:  # pragma: no cover - preflight support
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+    def do_OPTIONS(self) -> None:
+        self._write_json(200, _success_response({}))
 
-    def do_POST(self) -> None:  # pragma: no cover - runtime only
+    def do_POST(self) -> None:
         try:
             length = int(self.headers.get('Content-Length') or 0)
             raw = self.rfile.read(length).decode('utf-8')
@@ -690,42 +689,8 @@ class VercelRequestHandler(BaseHTTPRequestHandler):
         method = payload.get('method')
         params = payload.get('params', {})
         result = self.analyzer.dispatch(method, params)
-
         status = result.get('status', 200)
         self._write_json(status, result)
 
-    def log_message(self, *_args: Any, **_kwargs: Any) -> None:  # pragma: no cover - silence logs
+    def log_message(self, *_args: Any, **_kwargs: Any) -> None:
         return
-
-
-def handler(request, response):
-    if request.method != "POST":
-        response.status_code = 405
-        response.headers["Content-Type"] = "application/json; charset=utf-8"
-        return json.dumps(
-            {
-                "success": False,
-                "status": 405,
-                "error": {"message": "Method not allowed"},
-            },
-            ensure_ascii=False,
-        )
-
-    try:
-        payload = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        response.status_code = 400
-        response.headers["Content-Type"] = "application/json; charset=utf-8"
-        return json.dumps(
-            _error_response(400, "잘못된 JSON 요청입니다."),
-            ensure_ascii=False,
-        )
-
-    method = payload.get("method")
-    params = payload.get("params", {})
-    analyzer = StockAnalyzer()
-    result = analyzer.dispatch(method, params)
-
-    response.status_code = result.get("status", 200)
-    response.headers["Content-Type"] = "application/json; charset=utf-8"
-    return json.dumps(result, ensure_ascii=False)
