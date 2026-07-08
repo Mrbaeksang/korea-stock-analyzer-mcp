@@ -10,14 +10,12 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_NO_DEV=1 \
     PYTHONUNBUFFERED=1
 
-# Dependency layer: lockfile only, project source not needed (package = false).
-# No cache mounts — Railway's builder requires service-scoped mount ids,
-# which would break every fork.
-RUN --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project
-
+# Dependency layer before source copy for layer caching.
+# Plain COPY only — Railway's builder rejects bind/cache mounts without
+# service-scoped ids, which would break every fork.
 COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-install-project
+
 COPY src ./src
 
 ENV PATH="/app/.venv/bin:$PATH"
