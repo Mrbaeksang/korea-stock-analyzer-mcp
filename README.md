@@ -52,13 +52,13 @@ graph LR
 **claude.ai** — 설정 → 커넥터 → 커스텀 커넥터 추가:
 
 ```
-https://<your-deployment>.up.railway.app/mcp
+https://korea-stock-analyzer-mcp-production.up.railway.app/mcp
 ```
 
 **Claude Code**:
 
 ```bash
-claude mcp add --transport http korea-stock https://<your-deployment>.up.railway.app/mcp
+claude mcp add --transport http korea-stock https://korea-stock-analyzer-mcp-production.up.railway.app/mcp
 ```
 
 <details>
@@ -69,7 +69,7 @@ claude mcp add --transport http korea-stock https://<your-deployment>.up.railway
   "mcpServers": {
     "korea-stock": {
       "type": "http",
-      "url": "https://<your-deployment>.up.railway.app/mcp"
+      "url": "https://korea-stock-analyzer-mcp-production.up.railway.app/mcp"
     }
   }
 }
