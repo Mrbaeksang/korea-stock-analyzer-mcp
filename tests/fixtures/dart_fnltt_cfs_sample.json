@@ -1,0 +1,16 @@
+{
+  "status": "000",
+  "message": "정상",
+  "list": [
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "BS", "account_id": "ifrs-full_Assets", "account_nm": "자산총계", "thstrm_amount": "455905980000000", "frmtrm_amount": "426621158000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "BS", "account_id": "ifrs-full_Liabilities", "account_nm": "부채총계", "thstrm_amount": "112339878000000", "frmtrm_amount": "92228115000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "BS", "account_id": "ifrs-full_Equity", "account_nm": "자본총계", "thstrm_amount": "343566102000000", "frmtrm_amount": "334393043000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "BS", "account_id": "ifrs-full_IssuedCapital", "account_nm": "자본금", "thstrm_amount": "897514000000", "frmtrm_amount": "897514000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "CIS", "account_id": "ifrs-full_Revenue", "account_nm": "수익(매출액)", "thstrm_amount": "300870903000000", "frmtrm_amount": "258935494000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "CIS", "account_id": "dart_OperatingIncomeLoss", "account_nm": "영업이익", "thstrm_amount": "32725961000000", "frmtrm_amount": "6566976000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "CIS", "account_id": "ifrs-full_ProfitLoss", "account_nm": "당기순이익", "thstrm_amount": "34451351000000", "frmtrm_amount": "15487100000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "CF", "account_id": "ifrs-full_CashFlowsFromUsedInOperatingActivities", "account_nm": "영업활동현금흐름", "thstrm_amount": "62171613000000", "frmtrm_amount": "44137427000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "CF", "account_id": "ifrs-full_CashFlowsFromUsedInInvestingActivities", "account_nm": "투자활동현금흐름", "thstrm_amount": "-46791999000000", "frmtrm_amount": "-17961279000000"},
+    {"rcept_no": "20250311000123", "bsns_year": "2024", "sj_div": "CF", "account_id": "-표준계정코드 미사용-", "account_nm": "유형자산의 취득", "thstrm_amount": "-52496377000000", "frmtrm_amount": "-42934505000000"}
+  ]
+}
