@@ -22,3 +22,7 @@ def ping() -> str:
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request: Request) -> JSONResponse:
     return JSONResponse({"status": "healthy"})
+
+
+# Tool modules register themselves against `mcp` on import.
+from app.tools import discovery  # noqa: E402,F401
