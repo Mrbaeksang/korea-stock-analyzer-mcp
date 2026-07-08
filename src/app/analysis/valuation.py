@@ -1,8 +1,7 @@
 """Conservative valuation: multiples + three-scenario range.
 
-Three-scenario pattern adapted from ai-berkshire tools/financial_rigor.py
-(MIT License, Copyright (c) 2026 xbtlin). Every number carries its
-assumption source; there is no single "fair price" — only a range.
+Every number carries its assumption source; there is no single
+"fair price" — only a range.
 """
 
 from __future__ import annotations

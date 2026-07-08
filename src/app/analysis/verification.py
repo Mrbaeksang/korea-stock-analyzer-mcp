@@ -1,9 +1,5 @@
-"""Data-consistency checks.
-
-Ported pattern from ai-berkshire tools/financial_rigor.py (MIT License,
-Copyright (c) 2026 xbtlin): computed vs reported cross-checks with explicit
-tolerance, instead of trusting a single source.
-"""
+"""Data-consistency checks: computed vs reported cross-checks with explicit
+tolerance, instead of trusting a single source."""
 
 from __future__ import annotations
 

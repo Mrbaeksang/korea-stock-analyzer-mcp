@@ -3,7 +3,7 @@ name = "korea-stock-mcp"
 version = "2.0.0"
 description = "Conservative, data-honest Korean equity analysis MCP server (DART + KRX)"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=3,<4",

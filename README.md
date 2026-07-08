@@ -24,7 +24,7 @@
 - **실측 재무제표** — 사업보고서 기반 매출·영업이익·현금흐름 3~10개년, 연결(CFS) 우선/별도(OFS) 폴백 표시
 - **보수적 밸류에이션** — 단일 적정가 대신 3시나리오(비관/중립/낙관) 범위, 성장률·멀티플 가정 전부 응답에 포함
 - **리스크 우선** — 재무 적신호 6종 자동 검사 + 공시 위험 키워드 하이라이트, 검사 불가 항목도 구분 보고
-- **교차 검증** — 시가총액 정합성 검사(주가×주식수 vs 보고 시총) 등 [ai-berkshire](https://github.com/xbtlin/ai-berkshire) 검증 패턴 내장
+- **교차 검증** — 시가총액 정합성 검사(주가×주식수 vs 보고 시총) 등 데이터 정합성 검증 내장
 - **운영 기본기** — 글로벌 레이트 리밋, DART 쿼터 보호 캐싱, KRX IP 차단 방지 직렬화, 구조화 에러 메시지
 
 ## 🏗️ Architecture
@@ -135,20 +135,10 @@ uv run pytest -m live -o addopts=""    # 실제 KRX/DART 검증 (키 필요)
 
 본 서버의 출력은 공시·시세 데이터의 산술 가공 결과이며 **투자 자문이 아니다**. 시나리오 값은 명시된 가정의 계산 결과일 뿐 목표 주가가 아니다. 서버는 매수·매도·비중 판단을 제공하지 않으며, 투자 판단과 책임은 전적으로 이용자에게 있다.
 
-## 🗺️ Roadmap
-
-- [ ] 기관/외국인 수급 데이터 ([#10](https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/issues/10))
-- [ ] 실제 뉴스 검색 — 네이버 검색 API ([#11](https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/issues/11))
-- [ ] `analyze_company` 종합 리포트 + 수치 재대조 검증 게이트 ([#12](https://github.com/Mrbaeksang/korea-stock-analyzer-mcp/issues/12))
-
 ## 🤝 Contributing
 
 이슈·PR 환영. 원칙 하나만 지켜달라: **데이터가 없으면 없다고 답한다.** 추정치 주입·하드코딩 폴백이 들어간 PR은 받지 않는다. 테스트는 `uv run pytest` 통과 필수.
 
-## ⭐ Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Mrbaeksang/korea-stock-analyzer-mcp&type=Date)](https://www.star-history.com/#Mrbaeksang/korea-stock-analyzer-mcp&Date)
-
 ## 📜 License
 
-[MIT](LICENSE). 검증 로직 일부는 [ai-berkshire](https://github.com/xbtlin/ai-berkshire) (MIT, Copyright (c) 2026 xbtlin) 패턴 차용.
+[Apache-2.0](LICENSE)
