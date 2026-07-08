@@ -37,6 +37,14 @@ def test_missing_accounts_stay_none():
     assert fin["cfo"] is None
 
 
+def test_interest_expense_row_does_not_crash():
+    # regression: 이자비용 mapped in ACCOUNT_NM_MAP but was missing from FIELDS → KeyError
+    fin = extract_year_financials(
+        [{"sj_div": "IS", "account_id": "-표준계정코드 미사용-", "account_nm": "이자비용", "thstrm_amount": "1,000"}]
+    )
+    assert fin["interest_expense"] == 1000
+
+
 def test_malformed_amounts_stay_none():
     fin = extract_year_financials(
         [{"sj_div": "CIS", "account_id": "ifrs-full_Revenue", "account_nm": "수익(매출액)", "thstrm_amount": "-"}]

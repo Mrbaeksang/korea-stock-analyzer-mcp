@@ -46,6 +46,17 @@ class TestThreeScenario:
         assert all(s["growth_pct"] <= 0.0 for s in scenarios[:2])
         assert "이력 없음" in scenarios[0]["assumption_source"] or "없" in scenarios[0]["assumption_source"]
 
+    def test_negative_cagr_keeps_scenarios_ordered(self):
+        # regression: with negative growth, haircuts inverted the labels —
+        # "pessimistic" got the mildest decline and "optimistic" the worst.
+        result = three_scenario_valuation(eps=1000, historical_cagr_pct=-10.0, cagr_span_years=3)
+        scenarios = result["scenarios"]
+        growths = [s["growth_pct"] for s in scenarios]
+        values = [s["value_per_share"] for s in scenarios]
+        assert growths[0] <= growths[1] <= growths[2]
+        assert values[0] <= values[1] <= values[2]
+        assert growths[0] == -10.0  # pessimistic carries the full decline
+
     def test_extreme_cagr_is_capped(self):
         result = three_scenario_valuation(eps=1000, historical_cagr_pct=80.0, cagr_span_years=2)
         for s in result["scenarios"]:

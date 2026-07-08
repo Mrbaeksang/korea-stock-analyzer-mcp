@@ -12,6 +12,9 @@ mcp = FastMCP(
         "보수적 한국 주식 분석 서버. 모든 수치는 실측 출처(DART 공시, KRX 시세)에서만 "
         "제공하며, 데이터가 없으면 없다고 답한다. 매수/매도/비중 권고는 하지 않는다."
     ),
+    # Unexpected exceptions become a generic error; ToolError/DartError
+    # messages still pass through.
+    mask_error_details=True,
 )
 mcp.add_middleware(build_rate_limiter())
 

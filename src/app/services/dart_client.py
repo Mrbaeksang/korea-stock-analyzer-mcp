@@ -14,6 +14,7 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
+import anyio
 import httpx
 from cachetools import TTLCache
 from fastmcp.exceptions import ToolError
@@ -93,7 +94,42 @@ ACCOUNT_NM_MAP = {
 
 CAPEX_ACCOUNT_NAMES = ("유형자산의 취득", "유형자산의취득")
 
-FIELDS = [*dict.fromkeys(ACCOUNT_ID_MAP.values()), "capex"]
+FIELDS = [
+    *dict.fromkeys([*ACCOUNT_ID_MAP.values(), *ACCOUNT_NM_MAP.values()]),
+    "capex",
+]
+
+
+MAX_CORPCODE_XML_BYTES = 200 * 1024 * 1024  # zip-bomb guard
+
+
+def _parse_corp_map(raw: bytes) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for corp in ET.fromstring(raw).iter("list"):
+        stock_code = (corp.findtext("stock_code") or "").strip()
+        corp_code = (corp.findtext("corp_code") or "").strip()
+        if stock_code and corp_code:
+            mapping[stock_code] = corp_code
+    return mapping
+
+
+def _read_fresh_cache(cache_file: Path) -> bytes | None:
+    if cache_file.exists() and time.time() - cache_file.stat().st_mtime < CORPCODE_CACHE_TTL_SECONDS:
+        return cache_file.read_bytes()
+    return None
+
+
+def _unzip_corpcode(content: bytes) -> bytes:
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        info = zf.getinfo("CORPCODE.xml")
+        if info.file_size > MAX_CORPCODE_XML_BYTES:
+            raise DartError("DART corpCode 응답이 비정상적으로 큽니다 — 처리 중단.")
+        return zf.read("CORPCODE.xml")
+
+
+def _write_cache(cache_file: Path, raw: bytes) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_file.write_bytes(raw)
 
 
 def _parse_amount(raw: str | None) -> int | None:
@@ -152,14 +188,25 @@ class DartClient:
         self._corp_map: dict[str, str] | None = None
         self._corp_map_loaded_at: float = 0.0
         self._financials_cache: TTLCache = TTLCache(maxsize=256, ttl=FINANCIALS_CACHE_TTL_SECONDS)
-        # Shared connection pool; retries cover transient connect failures only.
-        self._http = httpx.AsyncClient(
-            timeout=30, transport=httpx.AsyncHTTPTransport(retries=2)
-        )
+        self._http: httpx.AsyncClient | None = None
+        self._http_loop = None
+
+    def _http_client(self) -> httpx.AsyncClient:
+        """Shared connection pool, created lazily and rebound if the event
+        loop changes (each pytest test runs its own loop)."""
+        import asyncio
+
+        loop = asyncio.get_running_loop()
+        if self._http is None or self._http_loop is not loop:
+            self._http = httpx.AsyncClient(
+                timeout=30, transport=httpx.AsyncHTTPTransport(retries=2)
+            )
+            self._http_loop = loop
+        return self._http
 
     async def _get(self, path: str, **params) -> httpx.Response:
         try:
-            response = await self._http.get(f"{DART_BASE}/{path}", params=params)
+            response = await self._http_client().get(f"{DART_BASE}/{path}", params=params)
             response.raise_for_status()
             return response
         except httpx.HTTPError as exc:
@@ -167,7 +214,7 @@ class DartClient:
 
     def _require_key(self) -> str:
         if not self._api_key:
-            raise RuntimeError(
+            raise DartError(
                 "DART_API_KEY 환경변수가 설정되지 않았습니다. https://opendart.fss.or.kr 에서 무료 발급."
             )
         return self._api_key
@@ -175,32 +222,25 @@ class DartClient:
     # -- corp code mapping -------------------------------------------------
 
     async def _load_corp_map(self) -> dict[str, str]:
-        now = time.monotonic()
+        now = time.time()
         if self._corp_map is not None and now - self._corp_map_loaded_at < CORPCODE_CACHE_TTL_SECONDS:
             return self._corp_map
 
         raw = await self._corpcode_xml()
-        mapping: dict[str, str] = {}
-        root = ET.fromstring(raw)
-        for corp in root.iter("list"):
-            stock_code = (corp.findtext("stock_code") or "").strip()
-            corp_code = (corp.findtext("corp_code") or "").strip()
-            if stock_code and corp_code:
-                mapping[stock_code] = corp_code
-        self._corp_map = mapping
+        # multi-MB XML with ~100k entries — parse off the event loop
+        self._corp_map = await anyio.to_thread.run_sync(_parse_corp_map, raw)
         self._corp_map_loaded_at = now
-        return mapping
+        return self._corp_map
 
     async def _corpcode_xml(self) -> bytes:
         cache_file = CACHE_DIR / "CORPCODE.xml"
-        if cache_file.exists() and time.time() - cache_file.stat().st_mtime < CORPCODE_CACHE_TTL_SECONDS:
-            return cache_file.read_bytes()
+        cached = await anyio.to_thread.run_sync(_read_fresh_cache, cache_file)
+        if cached is not None:
+            return cached
 
         response = await self._get("corpCode.xml", crtfc_key=self._require_key())
-        with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
-            raw = zf.read("CORPCODE.xml")
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        cache_file.write_bytes(raw)
+        raw = await anyio.to_thread.run_sync(_unzip_corpcode, response.content)
+        await anyio.to_thread.run_sync(_write_cache, cache_file, raw)
         return raw
 
     async def corp_code_for(self, ticker: str) -> str | None:

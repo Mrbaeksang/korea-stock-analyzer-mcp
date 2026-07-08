@@ -71,6 +71,14 @@ class TestAccrualQuality:
         assert flag_by_code(result, "earnings_cash_divergence")["triggered"] is True
 
 
+class TestEmptyInput:
+    def test_empty_years_returns_all_unavailable(self):
+        result = evaluate_financial_flags([])
+        assert result["flags"] == []
+        assert result["checked_count"] == 0
+        assert len(result["unavailable_checks"]) == 6
+
+
 class TestCleanCompany:
     def test_no_flags_reports_checked_count(self):
         result = evaluate_financial_flags([year(2022), year(2023), year(2024)])

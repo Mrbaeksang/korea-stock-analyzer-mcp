@@ -16,8 +16,17 @@ def _flag(code: str, description: str, triggered: bool, evidence: dict | None = 
     return {"code": code, "description": description, "triggered": triggered, "evidence": evidence}
 
 
+ALL_CHECKS = (
+    "high_debt_ratio", "low_interest_coverage", "negative_cfo_streak",
+    "revenue_decline_streak", "capital_impairment", "earnings_cash_divergence",
+)
+
+
 def evaluate_financial_flags(years: list[dict]) -> dict:
     """years: filed annual financials, oldest first (dart_client shape)."""
+    if not years:
+        return {"flags": [], "unavailable_checks": list(ALL_CHECKS), "checked_count": 0}
+
     flags: list[dict] = []
     unavailable: list[str] = []
     latest = years[-1]

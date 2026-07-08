@@ -61,7 +61,7 @@ def three_scenario_valuation(
 
     if historical_cagr_pct is None:
         base_growth = 0.0
-        growth_source = f"이익 성장 이력 없음 — 성장률 0% 보수 가정"
+        growth_source = "이익 성장 이력 없음 — 성장률 0% 보수 가정"
     else:
         base_growth = min(historical_cagr_pct, GROWTH_CAP_PCT)
         capped = " (연 20% 상한 적용)" if historical_cagr_pct > GROWTH_CAP_PCT else ""
@@ -69,7 +69,12 @@ def three_scenario_valuation(
 
     scenarios = []
     for name in ("pessimistic", "neutral", "optimistic"):
-        growth_pct = round(min(base_growth * GROWTH_HAIRCUTS[name], GROWTH_CAP_PCT), 2)
+        haircut = GROWTH_HAIRCUTS[name]
+        if base_growth < 0:
+            # Declining earnings: pessimistic must carry the FULL decline and
+            # optimistic the mildest — the haircut ladder inverts.
+            haircut = GROWTH_HAIRCUTS["optimistic"] - haircut
+        growth_pct = round(min(base_growth * haircut, GROWTH_CAP_PCT), 2)
         multiple = TARGET_MULTIPLES[name]
         projected_eps = eps * (1 + growth_pct / 100) ** HORIZON_YEARS
         scenarios.append(

@@ -1,4 +1,9 @@
-"""Lazy singletons for external-data clients. Tests swap them via set_*()."""
+"""Lazy singletons for external-data clients. Tests swap them via set_*().
+
+Invariant: getters are called only from the event loop thread and contain
+no await between check and create — no lock needed. If async initialization
+is ever added here, add double-checked locking with it.
+"""
 
 from __future__ import annotations
 
