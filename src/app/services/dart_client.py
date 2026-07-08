@@ -115,12 +115,20 @@ def _parse_corp_map(raw: bytes) -> dict[str, str]:
 
 
 def _read_fresh_cache(cache_file: Path) -> bytes | None:
-    if cache_file.exists() and time.time() - cache_file.stat().st_mtime < CORPCODE_CACHE_TTL_SECONDS:
-        return cache_file.read_bytes()
+    try:
+        if cache_file.exists() and time.time() - cache_file.stat().st_mtime < CORPCODE_CACHE_TTL_SECONDS:
+            return cache_file.read_bytes()
+    except OSError:
+        pass
     return None
 
 
 def _unzip_corpcode(content: bytes) -> bytes:
+    if not zipfile.is_zipfile(io.BytesIO(content)):
+        # DART answers with a JSON/XML error body instead of a zip when the
+        # key is invalid or quota is exhausted — surface that message.
+        snippet = content[:300].decode("utf-8", "ignore").strip()
+        raise DartError(f"DART corpCode 응답이 zip이 아닙니다. 응답: {snippet}")
     with zipfile.ZipFile(io.BytesIO(content)) as zf:
         info = zf.getinfo("CORPCODE.xml")
         if info.file_size > MAX_CORPCODE_XML_BYTES:
@@ -129,8 +137,13 @@ def _unzip_corpcode(content: bytes) -> bytes:
 
 
 def _write_cache(cache_file: Path, raw: bytes) -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache_file.write_bytes(raw)
+    """Best-effort disk cache — a read-only filesystem (common on
+    Kubernetes/KServe) must not break the request path."""
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_file.write_bytes(raw)
+    except OSError:
+        pass
 
 
 def _parse_amount(raw: str | None) -> int | None:

@@ -18,7 +18,8 @@ RUN uv sync --locked --no-install-project
 
 COPY src ./src
 
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH" \
+    APP_CACHE_DIR=/tmp/app-cache
 
 EXPOSE 8000
 
