@@ -1,50 +1,22 @@
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build outputs
-dist/
-build/
-*.js
-*.js.map
-*.d.ts
-!tsconfig.json
-!api/**/*.js
-!vercel.json
-
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Test files
-*.test.js
-*.spec.js
-test-*.py
-*.pyc
+# Python
 __pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Environment
+.env
+.env.*
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local data caches
+.cache/
 
 # Logs
-logs/
 *.log
-
-# OS Files
-Thumbs.db
-Desktop.ini
-
-# Temporary files
-*.tmp
-*.bak
-*.backup
-temp/
-tmp/
