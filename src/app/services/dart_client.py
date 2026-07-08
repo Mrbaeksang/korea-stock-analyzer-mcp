@@ -56,6 +56,7 @@ def raise_for_dart_status(body: dict) -> None:
 ANNUAL_REPORT_CODE = "11011"
 CORPCODE_CACHE_TTL_SECONDS = 60 * 60 * 24
 FINANCIALS_CACHE_TTL_SECONDS = 60 * 60 * 24
+DISCLOSURES_CACHE_TTL_SECONDS = 60 * 60
 CACHE_DIR = Path(os.environ.get("APP_CACHE_DIR", ".cache"))
 
 # account_id suffix → our field name. DART mixes ifrs-full_/ifrs_ prefixes
@@ -188,6 +189,7 @@ class DartClient:
         self._corp_map: dict[str, str] | None = None
         self._corp_map_loaded_at: float = 0.0
         self._financials_cache: TTLCache = TTLCache(maxsize=256, ttl=FINANCIALS_CACHE_TTL_SECONDS)
+        self._disclosures_cache: TTLCache = TTLCache(maxsize=256, ttl=DISCLOSURES_CACHE_TTL_SECONDS)
         self._http: httpx.AsyncClient | None = None
         self._http_loop = None
 
@@ -285,6 +287,10 @@ class DartClient:
     async def recent_disclosures(self, corp_code: str, days: int = 90) -> list[dict]:
         from datetime import timedelta
 
+        cache_key = (corp_code, days)
+        if cache_key in self._disclosures_cache:
+            return self._disclosures_cache[cache_key]
+
         end = date.today()
         begin = end - timedelta(days=days)
         response = await self._get(
@@ -298,16 +304,19 @@ class DartClient:
         body = response.json()
         raise_for_dart_status(body)
         if body.get("status") != "000":
-            return []
-        return [
-            {
-                "report_nm": item.get("report_nm"),
-                "rcept_dt": item.get("rcept_dt"),
-                "flr_nm": item.get("flr_nm"),
-                "rcept_no": item.get("rcept_no"),
-            }
-            for item in body.get("list", [])
-        ]
+            disclosures = []
+        else:
+            disclosures = [
+                {
+                    "report_nm": item.get("report_nm"),
+                    "rcept_dt": item.get("rcept_dt"),
+                    "flr_nm": item.get("flr_nm"),
+                    "rcept_no": item.get("rcept_no"),
+                }
+                for item in body.get("list", [])
+            ]
+        self._disclosures_cache[cache_key] = disclosures
+        return disclosures
 
     async def _call_fnltt(self, corp_code: str, year: int, fs_div: str) -> list[dict] | None:
         response = await self._get(
