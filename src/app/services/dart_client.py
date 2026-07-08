@@ -53,6 +53,8 @@ ACCOUNT_NM_MAP = {
     "영업활동으로인한현금흐름": "cfo",
     "투자활동현금흐름": "cfi",
     "투자활동으로인한현금흐름": "cfi",
+    "이자비용": "interest_expense",
+    "금융비용": "interest_expense",
 }
 
 CAPEX_ACCOUNT_NAMES = ("유형자산의 취득", "유형자산의취득")
@@ -192,6 +194,38 @@ class DartClient:
                 continue
             return {"year": year, "fs_div": fs_div, "report": "사업보고서", **financials}
         return None
+
+    # -- disclosures ---------------------------------------------------------
+
+    async def recent_disclosures(self, corp_code: str, days: int = 90) -> list[dict]:
+        from datetime import timedelta
+
+        end = date.today()
+        begin = end - timedelta(days=days)
+        async with httpx.AsyncClient(timeout=30) as http:
+            response = await http.get(
+                f"{DART_BASE}/list.json",
+                params={
+                    "crtfc_key": self._require_key(),
+                    "corp_code": corp_code,
+                    "bgn_de": begin.strftime("%Y%m%d"),
+                    "end_de": end.strftime("%Y%m%d"),
+                    "page_count": "100",
+                },
+            )
+        response.raise_for_status()
+        body = response.json()
+        if body.get("status") != "000":
+            return []
+        return [
+            {
+                "report_nm": item.get("report_nm"),
+                "rcept_dt": item.get("rcept_dt"),
+                "flr_nm": item.get("flr_nm"),
+                "rcept_no": item.get("rcept_no"),
+            }
+            for item in body.get("list", [])
+        ]
 
     async def _call_fnltt(
         self, http: httpx.AsyncClient, corp_code: str, year: int, fs_div: str
