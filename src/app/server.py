@@ -25,4 +25,4 @@ async def health(request: Request) -> JSONResponse:
 
 
 # Tool modules register themselves against `mcp` on import.
-from app.tools import discovery, financials  # noqa: E402,F401
+from app.tools import discovery, financials, valuation  # noqa: E402,F401
