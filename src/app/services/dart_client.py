@@ -255,12 +255,16 @@ class DartClient:
         if cache_key in self._financials_cache:
             return self._financials_cache[cache_key]
 
+        import asyncio
+
         latest_filed_year = date.today().year - 1
-        results: list[dict] = []
-        for year in range(latest_filed_year - years + 1, latest_filed_year + 1):
-            year_data = await self._fetch_year(corp_code, year)
-            if year_data is not None:
-                results.append(year_data)
+        year_range = range(latest_filed_year - years + 1, latest_filed_year + 1)
+        # Years fetched concurrently — sequential fetches blow the latency
+        # budget (PlayMCP p99 3s) on cold cache.
+        fetched = await asyncio.gather(
+            *(self._fetch_year(corp_code, year) for year in year_range)
+        )
+        results = [year_data for year_data in fetched if year_data is not None]
 
         self._financials_cache[cache_key] = results
         return results

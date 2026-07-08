@@ -19,9 +19,17 @@ mcp = FastMCP(
 mcp.add_middleware(build_rate_limiter())
 
 
-@mcp.tool
+@mcp.tool(
+    description="Health check for Korea Stock MCP(한국주식 분석 서버). Returns 'pong'.",
+    annotations={
+        "title": "Ping",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": False,
+        "idempotentHint": True,
+    },
+)
 def ping() -> str:
-    """서버 연결 확인용. 'pong'을 반환한다."""
     return "pong"
 
 

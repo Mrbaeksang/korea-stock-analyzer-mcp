@@ -22,13 +22,23 @@ def _keyword_of(report_nm: str | None) -> str | None:
     return next((kw for kw in RISK_KEYWORDS if kw in report_nm), None)
 
 
-@mcp.tool
+@mcp.tool(
+    description=(
+        "Detects financial red flags for a Korean listed company — high debt ratio, "
+        "low interest coverage, negative operating cash flow streaks, revenue decline, "
+        "capital impairment, earnings-cash divergence — plus recent DART(전자공시) "
+        "disclosures highlighted by risk keywords, via Korea Stock MCP(한국주식 분석). "
+        "Checks that could not run are listed separately, never silently passed."
+    ),
+    annotations={
+        "title": "Get Risk Flags",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": True,
+        "idempotentHint": True,
+    },
+)
 async def get_risk_flags(ticker: str, disclosure_days: int = 90) -> dict:
-    """재무 적신호 자동 탐지 + 최근 DART 공시 목록.
-
-    플래그가 없으면 '적신호 없음'을 검사 항목 수와 함께 명시한다.
-    데이터 부족으로 검사 못 한 항목은 unavailable_checks로 구분한다.
-    """
     ticker = validate_ticker(ticker)
     disclosure_days = max(7, min(disclosure_days, 365))
 

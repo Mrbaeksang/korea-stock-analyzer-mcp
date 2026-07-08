@@ -18,9 +18,23 @@ def validate_ticker(ticker: str) -> str:
     return ticker
 
 
-@mcp.tool
+READ_ONLY_TOOL = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "openWorldHint": True,
+    "idempotentHint": True,
+}
+
+
+@mcp.tool(
+    description=(
+        "Searches Korean listed companies (KOSPI/KOSDAQ) by company name or "
+        "6-digit ticker code via Korea Stock MCP(한국주식 분석). Returns up to 20 matches "
+        "with ticker, name, market and sector."
+    ),
+    annotations={"title": "Search Company", **READ_ONLY_TOOL},
+)
 async def search_company(query: str) -> dict:
-    """종목명 또는 6자리 코드로 한국 상장사를 검색한다. 최대 20건 반환."""
     query = query.strip()
     if not query:
         raise ToolError("검색어가 비어 있습니다.")
@@ -28,9 +42,16 @@ async def search_company(query: str) -> dict:
     return {"query": query, "count": len(matches), "matches": matches}
 
 
-@mcp.tool
+@mcp.tool(
+    description=(
+        "Retrieves the latest quote snapshot for a Korean stock — price, market cap, "
+        "52-week high/low, volume — with a market-cap consistency check, via "
+        "Korea Stock MCP(한국주식 분석). Every value carries its as-of date; missing data "
+        "is returned as null, never fabricated."
+    ),
+    annotations={"title": "Get Quote", **READ_ONLY_TOOL},
+)
 async def get_quote(ticker: str) -> dict:
-    """종목의 시세 스냅샷: 가격, 시가총액, 52주 고저, 거래량. 모든 값에 기준일 명시."""
     ticker = validate_ticker(ticker)
     quote = await deps.price_client().quote(ticker)
     if quote is None:

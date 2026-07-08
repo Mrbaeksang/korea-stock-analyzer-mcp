@@ -14,9 +14,22 @@ DISCLAIMER = (
 )
 
 
-@mcp.tool
+@mcp.tool(
+    description=(
+        "Computes a conservative valuation for a Korean stock — PER/PBR multiples "
+        "from filed EPS/BPS and a three-scenario (pessimistic/neutral/optimistic) "
+        "value range with all assumptions disclosed — via Korea Stock MCP(한국주식 분석). "
+        "Provides a range, not a price target; no buy/sell recommendations."
+    ),
+    annotations={
+        "title": "Get Valuation",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "openWorldHint": True,
+        "idempotentHint": True,
+    },
+)
 async def get_valuation(ticker: str) -> dict:
-    """보수적 밸류에이션: 실측 EPS/BPS 멀티플 + 3시나리오 가치 범위(가정 전부 명시)."""
     ticker = validate_ticker(ticker)
 
     quote = await deps.price_client().quote(ticker)
