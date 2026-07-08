@@ -4,6 +4,8 @@ from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from app.middleware import build_rate_limiter
+
 mcp = FastMCP(
     name="korea-stock-mcp",
     instructions=(
@@ -11,6 +13,7 @@ mcp = FastMCP(
         "제공하며, 데이터가 없으면 없다고 답한다. 매수/매도/비중 권고는 하지 않는다."
     ),
 )
+mcp.add_middleware(build_rate_limiter())
 
 
 @mcp.tool

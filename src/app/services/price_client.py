@@ -10,11 +10,27 @@ from datetime import date, timedelta
 
 import anyio
 from cachetools import TTLCache
+from fastmcp.exceptions import ToolError
 
 LISTING_TTL_SECONDS = 60 * 60 * 24
 QUOTE_TTL_SECONDS = 60 * 10
 
 DATA_SOURCE = "KRX via FinanceDataReader"
+
+# One KRX scrape at a time: Railway gives every user a single shared egress
+# IP and KRX permanently blocks abusive IPs — throughput is not worth the IP.
+_FDR_LIMITER = anyio.CapacityLimiter(1)
+
+
+async def _run_fdr(fn, *args):
+    try:
+        return await anyio.to_thread.run_sync(fn, *args, limiter=_FDR_LIMITER)
+    except ToolError:
+        raise
+    except Exception as exc:
+        raise ToolError(
+            f"KRX 시세 조회 실패 ({type(exc).__name__}) — 일시적 네트워크 문제일 수 있습니다. 잠시 후 재시도하세요."
+        ) from exc
 
 
 class PriceClient:
@@ -66,7 +82,7 @@ class PriceClient:
                     )
             return out[:20]
 
-        return await anyio.to_thread.run_sync(_search)
+        return await _run_fdr(_search)
 
     # -- quote -----------------------------------------------------------
 
@@ -74,7 +90,7 @@ class PriceClient:
         if ticker in self._quote_cache:
             return self._quote_cache[ticker]
 
-        result = await anyio.to_thread.run_sync(self._load_quote, ticker)
+        result = await _run_fdr(self._load_quote, ticker)
         if result is not None:
             self._quote_cache[ticker] = result
         return result

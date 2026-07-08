@@ -1,3 +1,10 @@
+import os
+
+# Loosen the global rate limit before app.server is imported anywhere —
+# the suite hammers the in-memory server far faster than real clients.
+os.environ.setdefault("RATE_LIMIT_RPS", "10000")
+os.environ.setdefault("RATE_LIMIT_BURST", "10000")
+
 import pytest
 
 from app import deps
