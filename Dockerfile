@@ -10,9 +10,10 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_NO_DEV=1 \
     PYTHONUNBUFFERED=1
 
-# Dependency layer: lockfile only, project source not needed (package = false)
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
+# Dependency layer: lockfile only, project source not needed (package = false).
+# No cache mounts — Railway's builder requires service-scoped mount ids,
+# which would break every fork.
+RUN --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project
 
