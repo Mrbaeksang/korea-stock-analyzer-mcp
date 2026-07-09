@@ -18,7 +18,7 @@ DISCLAIMER = (
     description=(
         "Computes a conservative valuation for a Korean stock — PER/PBR multiples "
         "from filed EPS/BPS and a three-scenario (pessimistic/neutral/optimistic) "
-        "value range with all assumptions disclosed — via 한국주식 분석 (Korea Stock MCP). "
+        "value range with all assumptions disclosed — via Korea Stock MCP(한국주식 분석). "
         "Provides a range, not a price target; no buy/sell recommendations."
     ),
     annotations={

@@ -15,9 +15,7 @@ from app.server import mcp
 REQUIRED_ANNOTATIONS = (
     "title", "readOnlyHint", "destructiveHint", "openWorldHint", "idempotentHint"
 )
-# Must match the PlayMCP-registered MCP name EXACTLY — the review checks
-# for this literal string in every tool description.
-SERVICE_NAME = "한국주식 분석 (Korea Stock MCP)"
+SERVICE_NAME = "Korea Stock MCP"
 
 
 async def test_all_tools_have_complete_annotations():

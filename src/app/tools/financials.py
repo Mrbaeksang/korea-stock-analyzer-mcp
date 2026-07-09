@@ -16,7 +16,7 @@ DATA_SOURCE = "DART 전자공시 사업보고서 (fnlttSinglAcntAll)"
         "Retrieves audited annual financial statements (revenue, operating income, "
         "net income, balance sheet, cash flows) and profitability/stability/growth "
         "ratios for a Korean listed company from DART(전자공시) filings, via "
-        "한국주식 분석 (Korea Stock MCP). Consolidated statements preferred; missing "
+        "Korea Stock MCP(한국주식 분석). Consolidated statements preferred; missing "
         "items are null, never estimated."
     ),
     annotations={

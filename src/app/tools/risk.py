@@ -27,7 +27,7 @@ def _keyword_of(report_nm: str | None) -> str | None:
         "Detects financial red flags for a Korean listed company — high debt ratio, "
         "low interest coverage, negative operating cash flow streaks, revenue decline, "
         "capital impairment, earnings-cash divergence — plus recent DART(전자공시) "
-        "disclosures highlighted by risk keywords, via 한국주식 분석 (Korea Stock MCP). "
+        "disclosures highlighted by risk keywords, via Korea Stock MCP(한국주식 분석). "
         "Checks that could not run are listed separately, never silently passed."
     ),
     annotations={
