@@ -29,7 +29,7 @@ READ_ONLY_TOOL = {
 @mcp.tool(
     description=(
         "Searches Korean listed companies (KOSPI/KOSDAQ) by company name or "
-        "6-digit ticker code via Korea Stock MCP(한국주식 분석). Returns up to 20 matches "
+        "6-digit ticker code via 한국주식 분석 (Korea Stock MCP). Returns up to 20 matches "
         "with ticker, name, market and sector."
     ),
     annotations={"title": "Search Company", **READ_ONLY_TOOL},
@@ -46,7 +46,7 @@ async def search_company(query: str) -> dict:
     description=(
         "Retrieves the latest quote snapshot for a Korean stock — price, market cap, "
         "52-week high/low, volume — with a market-cap consistency check, via "
-        "Korea Stock MCP(한국주식 분석). Every value carries its as-of date; missing data "
+        "한국주식 분석 (Korea Stock MCP). Every value carries its as-of date; missing data "
         "is returned as null, never fabricated."
     ),
     annotations={"title": "Get Quote", **READ_ONLY_TOOL},

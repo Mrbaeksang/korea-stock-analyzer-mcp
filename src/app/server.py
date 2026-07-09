@@ -20,7 +20,7 @@ mcp.add_middleware(build_rate_limiter())
 
 
 @mcp.tool(
-    description="Health check for Korea Stock MCP(한국주식 분석 서버). Returns 'pong'.",
+    description="Health check for 한국주식 분석 (Korea Stock MCP). Returns 'pong'.",
     annotations={
         "title": "Ping",
         "readOnlyHint": True,
