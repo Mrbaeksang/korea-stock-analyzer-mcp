@@ -9,6 +9,7 @@
 [![Python](https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white)](https://www.python.org)
 [![FastMCP](https://img.shields.io/badge/built%20with-FastMCP%203-6e56cf)](https://gofastmcp.com)
 [![MCP](https://img.shields.io/badge/MCP-remote%20server-000)](https://modelcontextprotocol.io)
+[![MCP status](https://mcpvitals.com/badge/a05929a97d.svg)](https://mcpvitals.com/status/a05929a97d)
 [![License](https://img.shields.io/github/license/Mrbaeksang/korea-stock-analyzer-mcp.svg)](LICENSE)
 
 </div>
